@@ -28,7 +28,7 @@ export default class FrenchTypos extends Plugin {
 			if (activeView) {
 				const editor = activeView.editor;
 				const cursor = editor.getCursor();
-				if (event.key === "") {
+				if (event.key === "'") {
 					event.preventDefault();
 					editor.replaceRange("’", cursor);
 					editor.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
