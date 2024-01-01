@@ -2,6 +2,8 @@
 
 When typing, this plugin replaces straight apostrophes ' with typographic apostrophes ’, standard quotation marks " with French opening « or closing » quotation marks, and -- with em dashes —.
 
+When you type Enter, y add one more Enter. I suggest using this function with [Liner plugin](https://github.com/platers/obsidian-linter), to autocorrect Markdown syntax.
+
 From copmmand palette, you can launch **Apostrophes** to replace all the basic apostrophes in a document.
 
 ## Manual Installation
