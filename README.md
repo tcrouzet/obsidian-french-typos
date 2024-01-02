@@ -1,6 +1,6 @@
 # French Typos
 
-When typing, in Live Preview, this plugin replaces straight apostrophes ' with typographic apostrophes ’, standard quotation marks " with French opening « or closing » quotation marks, and -- with em dashes —.
+When typing, in Live Preview, this plugin replaces straight apostrophes ' with typographic apostrophes ’, standard quotation marks " with French opening "« " or closing " »" quotation marks, and "-- " with em dashes "—".
 
 When you type Enter, y add one more Enter. I suggest using this function with [Linter plugin](https://github.com/platers/obsidian-linter), to autocorrect Markdown syntax.
 
