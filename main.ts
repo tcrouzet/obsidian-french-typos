@@ -1,11 +1,23 @@
-import { Editor, MarkdownView, Plugin } from 'obsidian';
+import { App, Editor, MarkdownView, PluginSettingTab, Plugin, Setting, TFile } from 'obsidian';
 
 interface FrenchTyposSettings {
-	mySetting: string;
+	apostrophe: boolean;
+	quotationmarks: boolean;
+	emdashes: boolean;
+	twoenters: boolean;
+	desactivatelinks: boolean;
+	nobrcss: boolean;
+	hyphenate: boolean;
 }
 
 const DEFAULT_SETTINGS: FrenchTyposSettings = {
-	mySetting: 'default'
+	apostrophe: true,
+	quotationmarks: true,
+	emdashes: true,
+	twoenters: true,
+	desactivatelinks: true,
+	nobrcss: false,
+	hyphenate: true
 }
 
 export default class FrenchTypos extends Plugin {
@@ -14,6 +26,8 @@ export default class FrenchTypos extends Plugin {
 
 	async onload() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+
+		this.addSettingTab(new FrenchTyposSettingTab(this.app, this));
 
 		this.addCommand({
 			id: 'Apostrophes',
@@ -24,15 +38,18 @@ export default class FrenchTypos extends Plugin {
 		});
 
 		this.registerDomEvent(document, 'keydown', (event: KeyboardEvent) => {
+			const activeState = this.app.workspace.getLeaf().getViewState().state
 			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-			if (activeView) {
+			if (activeView && activeView.getMode() === 'source' && activeState["source"] === false) {
 				const editor = activeView.editor;
 				const cursor = editor.getCursor();
-				if (event.key === "'") {
+
+				if (event.key === "'" && this.settings.apostrophe) {
 					event.preventDefault();
 					editor.replaceRange("’", cursor);
 					editor.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
-				} else if (event.key === '"') {
+				
+				} else if (event.key === '"' && this.settings.quotationmarks) {
 					event.preventDefault();
 					if (this.openQuote) {
 						editor.replaceRange("« ", cursor);
@@ -41,17 +58,47 @@ export default class FrenchTypos extends Plugin {
 					}
 					editor.setCursor({ line: cursor.line, ch: cursor.ch + 2 });
 					this.openQuote = !this.openQuote;
-				} else if (event.key === '-' && editor.getRange({ line: cursor.line, ch: cursor.ch - 1 }, cursor) === '-') {
+
+				} else if (event.key === ' ' && editor.getRange({ line: cursor.line, ch: cursor.ch - 2 }, cursor) === '--' && this.settings.emdashes) {
 					event.preventDefault();
 					editor.replaceRange("— ", { line: cursor.line, ch: cursor.ch - 2 }, { line: cursor.line, ch: cursor.ch });
-					editor.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
-				} else if (event.key === 'Enter') {
+				
+				} else if (event.key === 'Enter'  && this.settings.twoenters) {
 					event.preventDefault();
 					editor.replaceRange("\n\n", cursor);
 					editor.setCursor({ line: cursor.line + 2, ch: cursor.ch });
 				}
 			}
 		});
+
+		this.registerDomEvent(document, 'click', (event: MouseEvent) => {
+			const target = event.target as HTMLElement;
+			const parent = target.parentNode as HTMLElement;
+			const ancertor = parent.parentNode;
+			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+			const activeState = this.app.workspace.getLeaf().getViewState().state
+
+			// Empêcher l'ouverture des liens cm-link
+			if (activeView && activeView.getMode() === 'source' && activeState["source"] === false && parent.classList.contains('cm-link') && this.settings.desactivatelinks) {
+				event.preventDefault();
+				event.stopPropagation();
+				const editor = activeView.editor;
+				const linktext = target.textContent ?? '';
+				const longtext = ancertor?.textContent ?? '';
+				this.MoveCursor(editor, longtext, linktext);
+			}
+
+		}, true);
+
+		if (this.settings.nobrcss) {
+			await this.injectCSS(this.nobrcss());
+		}
+
+		if (this.settings.hyphenate) {
+			await this.setLanguage();
+			await this.injectCSS(this.hyphenscss());
+		}
+
 	}
 
 	updateApostrophes(editor: Editor) {
@@ -60,5 +107,194 @@ export default class FrenchTypos extends Plugin {
 		const updatedText = text.replace(/'/g, "’");
 		editor.setValue(updatedText);
 		editor.setCursor(cursor);
+	}
+
+	MoveCursor(editor: Editor, longtext: string, linktext: string) {
+		const markdownContent = editor.getValue();
+		const lines = markdownContent.split('\n');
+		//console.log(longtext);
+		//console.log(linktext)
+
+		for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+			const nolink = this.noLinks(lines[lineIndex]);
+			const lIndex = nolink.indexOf(this.noLinks(longtext));
+	
+			if (lIndex !== -1) {
+				//console.log("Line: "+lIndex);
+				//console.log(lines[lineIndex]);
+				const search = "["+linktext+"]";
+				//console.log(search);
+				let localIndex = lines[lineIndex].indexOf(search);
+				if (localIndex !== -1) {
+					const coords = { line: lineIndex, ch: localIndex }
+					//console.log(coords)
+					editor.setCursor(coords);
+				}
+			}
+		}
+	}
+
+	noLinks(makdown: string){
+		return makdown.replace(/\[(.*?)\]\(.*?\)/g, '$1');
+	}
+
+	async setLanguage() {
+        document.documentElement.setAttribute('lang', 'fr');
+    }
+
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
+	}
+
+	// /Users/thierrycrouzet/Documents/ObsidianDev/.obsidian/plugins/obsidian-french-typos/nobr.css
+	async injectCSS(css: string) {
+		const styleEl = document.createElement('style');
+		styleEl.innerHTML = css;
+		document.head.appendChild(styleEl);
+    }
+
+	nobrcss() {
+		return `
+		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header{
+			text-indent: 0rem !important;
+		}
+		
+		.markdown-source-view.mod-cm6.is-live-preview .cm-line {
+			text-indent: 2rem;
+		}
+		
+		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-1{
+			margin-bottom: 2rem !important;
+		}
+		
+		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-2{
+			margin-top: 1rem !important;
+		}
+		
+		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-3{
+			margin-top: 1rem !important;
+		}
+		
+		.markdown-source-view.mod-cm6.is-live-preview .cm-line:has(> br) {
+			display: none;
+		}
+		
+		.markdown-source-view.mod-cm6.is-live-preview .cm-active:has(> br) {
+			display: inline !important;
+		}
+		
+		.markdown-source-view.mod-cm6.is-live-preview .cm-line.HyperMD-list-line {
+			margin: 0.25rem 0;
+		}
+		`
+	}
+
+	hyphenscss() {
+		return `
+		.markdown-preview-view p {
+			text-indent: 3rem;
+			text-align: justify;
+			margin-top: 0;
+			margin-bottom: 0;
+			hyphens: auto;
+			word-wrap: break-word;
+			hyphenate-character: auto;
+		    hyphenate-limit-chars: 6 3 3;
+		}
+		`
+	}	
+	
+}
+
+class FrenchTyposSettingTab extends PluginSettingTab {
+	plugin: FrenchTypos;
+
+	constructor(app: App, plugin: FrenchTypos) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const {containerEl} = this;
+
+		containerEl.empty();
+
+		const titleEl = containerEl.createEl('h2', { text: 'French Typos settings' });
+		const desEl = containerEl.createEl('p', { text: 'Works mainly in Live Preview mode.' });
+
+		new Setting(containerEl)
+			.setName('Apostrophe')
+			.setDesc('Activate typographic apostrophe')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.apostrophe)
+				.onChange(async (value) => {
+					this.plugin.settings.apostrophe = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+		.setName('French quotation marks and hard spaces')
+		.setDesc('Convert standard quotation marks')
+		.addToggle(toggle => toggle
+			.setValue(this.plugin.settings.quotationmarks)
+			.onChange(async (value) => {
+				this.plugin.settings.quotationmarks = value;
+				await this.plugin.saveSettings();
+			}));
+	
+		new Setting(containerEl)
+		.setName('Em dashes')
+		.setDesc('Convert "-- " into em dashes')
+		.addToggle(toggle => toggle
+			.setValue(this.plugin.settings.emdashes)
+			.onChange(async (value) => {
+				this.plugin.settings.emdashes = value;
+				await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+		.setName('Two Enters for one')
+		.setDesc('One Enter create a Markdown paragraph')
+		.addToggle(toggle => toggle
+			.setValue(this.plugin.settings.twoenters)
+			.onChange(async (value) => {
+				this.plugin.settings.twoenters = value;
+				await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+		.setName('Simulate Shift+Clic on links')
+		.setDesc('Display the URL instead of opening')
+		.addToggle(toggle => toggle
+			.setValue(this.plugin.settings.desactivatelinks)
+			.onChange(async (value) => {
+				this.plugin.settings.desactivatelinks = value;
+				await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+		.setName('Empty lines invisible')
+		.setDesc('Like a normal word processor (reload your Vault to process)')
+		.addToggle(toggle => toggle
+			.setValue(this.plugin.settings.nobrcss)
+			.onChange(async (value) => {
+				this.plugin.settings.nobrcss = value;
+				await this.plugin.saveSettings();
+			}));
+	
+		new Setting(containerEl)
+		.setName('Hyphenate French rules')
+		.setDesc('Only in Reading view (reload your Vault to process)')
+		.addToggle(toggle => toggle
+			.setValue(this.plugin.settings.hyphenate)
+			.onChange(async (value) => {
+				this.plugin.settings.hyphenate = value;
+				await this.plugin.saveSettings();
+			}));
+
 	}
 }
