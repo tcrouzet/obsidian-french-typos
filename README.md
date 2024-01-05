@@ -9,7 +9,7 @@ From command palette, you can launch **Apostrophes** to replace all the basic ap
 ## Manual Installation
 Hopefully, this plugin will make it to Obsidian's plugin gallery, until then, you can install it manually:
 
-Download the main.js, styles.css and manifest.json files from the latest release's package.
+Download the main.js, main.ts and manifest.json files from the latest release's package.
 Go to the /.obsidian/plugins folder of your Obsidian vault. Create /obsidian-french-typos in there.
 Put the downloaded files into the /obsidian-french-typos folder.
 Restart Obsidian.
