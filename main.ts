@@ -8,6 +8,7 @@ interface FrenchTyposSettings {
 	desactivatelinks: boolean;
 	nobrcss: boolean;
 	hyphenate: boolean;
+	emptytlines: string;
 }
 
 const DEFAULT_SETTINGS: FrenchTyposSettings = {
@@ -17,7 +18,8 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	twoenters: true,
 	desactivatelinks: true,
 	nobrcss: false,
-	hyphenate: true
+	hyphenate: true,
+	emptytlines: 'normal'
 }
 
 export default class FrenchTypos extends Plugin {
@@ -46,8 +48,16 @@ export default class FrenchTypos extends Plugin {
 
 				if (event.key === "'" && this.settings.apostrophe) {
 					event.preventDefault();
-					editor.replaceRange("’", cursor);
-					editor.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
+					const selection = editor.getSelection();
+				
+					if (selection.length > 0) {
+						// Remplace le texte sélectionné par l’apostrophe
+						editor.replaceSelection("’");
+					} else {
+						// Insère l’apostrophe à la position du curseur
+						editor.replaceRange("’", cursor);
+						editor.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
+					}
 				
 				} else if (event.key === '"' && this.settings.quotationmarks) {
 					event.preventDefault();
@@ -90,9 +100,12 @@ export default class FrenchTypos extends Plugin {
 
 		}, true);
 
-		if (this.settings.nobrcss) {
+		if (this.settings.emptytlines == "invisible") {
 			await this.injectCSS(this.nobrcss());
+		}else if (this.settings.emptytlines == "small"){
+			await this.injectCSS(this.small_interline());
 		}
+
 
 		if (this.settings.hyphenate) {
 			await this.setLanguage();
@@ -206,7 +219,23 @@ export default class FrenchTypos extends Plugin {
 		    hyphenate-limit-chars: 6 3 3;
 		}
 		`
-	}	
+	}
+
+	small_interline() {
+		return `
+		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header{
+			text-indent: 0rem !important;
+		}
+
+		.markdown-source-view.mod-cm6.is-live-preview .cm-line {
+			text-indent: 2rem;
+		}
+
+		.markdown-source-view.mod-cm6.is-live-preview .cm-line:has(> br) {
+			height: 0.7rem;text-indent: 2rem;
+		}
+	`
+	}
 	
 }
 
@@ -277,14 +306,20 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 			}));
 
 		new Setting(containerEl)
-		.setName('Empty lines invisible')
-		.setDesc('Like a normal word processor (reload your Vault to process)')
-		.addToggle(toggle => toggle
-			.setValue(this.plugin.settings.nobrcss)
-			.onChange(async (value) => {
-				this.plugin.settings.nobrcss = value;
+		.setName('Empty lines')
+		.setDesc('Reload your Vault to process…')
+		.addDropdown(dropdown => {
+			dropdown.addOptions({
+				'normal': 'Normal',
+				'small': 'Small',
+				'invisible': 'Invisible'
+			});
+			dropdown.setValue(this.plugin.settings.emptytlines);
+			dropdown.onChange(async (value) => {
+				this.plugin.settings.emptytlines = value;
 				await this.plugin.saveSettings();
-			}));
+			});
+		});
 	
 		new Setting(containerEl)
 		.setName('Hyphenate French rules')
