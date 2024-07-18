@@ -6,7 +6,6 @@ interface FrenchTyposSettings {
 	emdashes: boolean;
 	twoenters: boolean;
 	desactivatelinks: boolean;
-	nobrcss: boolean;
 	hyphenate: boolean;
 	emptytlines: string;
 }
@@ -17,7 +16,6 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	emdashes: true,
 	twoenters: true,
 	desactivatelinks: true,
-	nobrcss: false,
 	hyphenate: true,
 	emptytlines: 'normal'
 }

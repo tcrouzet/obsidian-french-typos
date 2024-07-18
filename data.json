@@ -1,0 +1,10 @@
+{
+  "apostrophe": true,
+  "quotationmarks": true,
+  "emdashes": true,
+  "twoenters": false,
+  "desactivatelinks": true,
+  "nobrcss": false,
+  "hyphenate": true,
+  "emptytlines": "small"
+}

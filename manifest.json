@@ -3,7 +3,7 @@
 	"name": "French Typos",
 	"version": "1.0.1",
 	"minAppVersion": "1.0.1",
-	"description": "Automatic typographic apostrophe, French quotation marks and more",
+	"description": "Automatic typographic apostrophe, French quotation marks and dialog mark for Obsidian",
 	"author": "Thierry Crouzet",
 	"authorUrl": "https://tcrouzet.com",
 	"fundingUrl": "https://www.paypal.com/donate/?business=MCZTJGYPGXXCW&no_recurring=0&currency_code=EUR",
