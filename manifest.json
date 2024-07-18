@@ -1,8 +1,8 @@
 {
 	"id": "french-typos",
 	"name": "French Typos",
-	"version": "1.0.0",
-	"minAppVersion": "1.0.0",
+	"version": "1.0.1",
+	"minAppVersion": "1.0.1",
 	"description": "Automatic typographic apostrophe, French quotation marks and more",
 	"author": "Thierry Crouzet",
 	"authorUrl": "https://tcrouzet.com",
