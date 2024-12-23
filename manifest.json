@@ -1,7 +1,7 @@
 {
 	"id": "french-typos",
 	"name": "French Typos",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"minAppVersion": "1.5.0",
 	"description": "Automatic typographic apostrophe, French quotation marks and dialog mark for Obsidian",
 	"author": "Thierry Crouzet",
