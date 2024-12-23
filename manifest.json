@@ -6,6 +6,8 @@
 	"description": "Automatic typographic apostrophe, French quotation marks and dialog mark for Obsidian",
 	"author": "Thierry Crouzet",
 	"authorUrl": "https://tcrouzet.com",
-	"fundingUrl": "https://www.paypal.com/donate/?business=MCZTJGYPGXXCW&no_recurring=0&currency_code=EUR",
+	"fundingUrl": {
+		"Visit my site": "https://tctouzet.com"
+	},
 	"isDesktopOnly": false
 }
