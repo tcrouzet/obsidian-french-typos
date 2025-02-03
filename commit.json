@@ -1,0 +1,7 @@
+{
+    "id": "french-typos",
+    "name": "French Typos",
+    "author": "Thierry Crouzet",
+    "description": "Automatic typographic apostrophe, French quotation marks and more",
+    "repo": "tcrouzet/obsidian-french-typos"
+}

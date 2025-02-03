@@ -40,8 +40,14 @@ export default class FrenchTypos extends Plugin {
 		});
 
 		this.registerDomEvent(document, 'keydown', (event: KeyboardEvent) => {
-			const activeState = this.app.workspace.getLeaf().getViewState().state
 			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+
+			if (!activeView || activeView.getMode() !== 'source') {
+				return;
+			}
+
+			const activeState = this.app.workspace.getLeaf().getViewState().state
+
 			if (activeView && activeView.getMode() === 'source' && activeState["source"] === false) {
 				const editor = activeView.editor;
 				const cursor = editor.getCursor();
@@ -82,12 +88,27 @@ export default class FrenchTypos extends Plugin {
 		});
 
 		this.registerDomEvent(document, 'click', (event: MouseEvent) => {
+
 			const target = event.target as HTMLElement;
+			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+
+			if (!activeView)
+				return;
+
+			const mode = activeView?.getMode()
+			if (mode == "source" || mode == "preview")
+				return;
+		
+			// Vérifier si le clic est dans l'éditeur actif
+			const editorEl = activeView.containerEl.querySelector('.cm-editor');
+			if (editorEl && !editorEl.contains(target)) {
+				return;
+			}
+		
 			const parent = target.parentNode as HTMLElement;
 			const ancertor = parent.parentNode;
-			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-			const activeState = this.app.workspace.getLeaf().getViewState().state
-
+			const activeState = this.app.workspace.getLeaf().getViewState().state;
+		
 			// Empêcher l'ouverture des liens cm-link
 			if (activeView && activeView.getMode() === 'source' && activeState["source"] === false && parent.classList.contains('cm-link') && this.settings.desactivatelinks) {
 				event.preventDefault();
@@ -97,7 +118,7 @@ export default class FrenchTypos extends Plugin {
 				const longtext = ancertor?.textContent ?? '';
 				this.MoveCursor(editor, longtext, linktext);
 			}
-
+	
 		}, true);
 
 		if (this.settings.emptytlines == "invisible") {

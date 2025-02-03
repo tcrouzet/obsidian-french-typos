@@ -3,7 +3,7 @@
 
 
 # Variables
-REPO="tcrouzet/obsidian-french-typos"
+REPO=REPO=$(jq -r '.repo' commit.json)
 TAG=$(jq -r '.version' manifest.json) 
 RELEASE_NAME="$TAG"
 DESCRIPTION="Release $TAG"
