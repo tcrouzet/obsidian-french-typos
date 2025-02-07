@@ -1,6 +1,7 @@
-// tcrouzet
-
 import { App, Editor, MarkdownView, PluginSettingTab, Plugin, Setting, TFile } from 'obsidian';
+import { EditorView, Decoration, ViewPlugin, ViewUpdate } from '@codemirror/view';
+import { RangeSetBuilder } from '@codemirror/state';
+
 
 interface FrenchTyposSettings {
 	apostrophe: boolean;
@@ -10,6 +11,8 @@ interface FrenchTyposSettings {
 	desactivatelinks: boolean;
 	hyphenate: boolean;
 	emptytlines: string;
+	highlightEnabled: boolean;
+	highlightButton: boolean;
 }
 
 const DEFAULT_SETTINGS: FrenchTyposSettings = {
@@ -19,7 +22,9 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	twoenters: false,
 	desactivatelinks: true,
 	hyphenate: true,
-	emptytlines: 'small'
+	emptytlines: 'small',
+	highlightEnabled: true,
+	highlightButton: true,
 }
 
 export default class FrenchTypos extends Plugin {
@@ -127,11 +132,20 @@ export default class FrenchTypos extends Plugin {
 			await this.injectCSS(this.small_interline());
 		}
 
-
 		if (this.settings.hyphenate) {
 			await this.setLanguage();
 			await this.injectCSS(this.hyphenscss());
 		}
+
+		// Highlighting zone
+
+		this.addStyles();
+
+		this.registerEditorExtension(this.createDecorations());
+
+        // Add a status bar item
+        // this.addStatusBarButton();
+		this.updateStatusBarButton();
 
 	}
 
@@ -182,6 +196,7 @@ export default class FrenchTypos extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.updateStatusBarButton();
 	}
 
 	// /Users/thierrycrouzet/Documents/ObsidianDev/.obsidian/plugins/obsidian-french-typos/nobr.css
@@ -257,7 +272,147 @@ export default class FrenchTypos extends Plugin {
 		}
 	`
 	}
+
+	// Highlighting zone
+
+    createDecorations() {
+        const invisibleCharDecoration = Decoration.mark({
+            class: 'invisible-char'
+        });
+
+	    const emDashDecoration = Decoration.mark({
+			class: 'em-dash-char'
+		});
+		const plugin = this;
+
+        return ViewPlugin.fromClass(class {
+            decorations: any;
+
+            constructor(view: EditorView) {
+                this.decorations = this.buildDecorations(view);
+            }
+
+            update(update: ViewUpdate) {
+                if (update.docChanged || update.viewportChanged) {
+                    this.decorations = this.buildDecorations(update.view);
+                }
+            }
+
+            buildDecorations(view: EditorView) {
+                const builder = new RangeSetBuilder<Decoration>();
+				if (plugin.settings.highlightEnabled) {
+					for (let { from, to } of view.visibleRanges) {
+						let text = view.state.doc.sliceString(from, to);
+						for (let i = 0; i < text.length; i++) {
+							if (text[i] === '\u00A0') { // Unicode for non-breaking space
+								builder.add(from + i, from + i + 1, invisibleCharDecoration);
+							}
+							if (text[i] === '—') { // Unicode for em dash
+								builder.add(from + i, from + i + 1, emDashDecoration);
+							}
+						}
+					}
+				}
+                return builder.finish();
+            }
+        }, {
+            decorations: v => v.decorations
+        });
+    }
+
+    addStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+		    .cm-line .invisible-char {
+				position: relative;
+			}
+			.cm-line .invisible-char::after {
+				content: '·';
+				position: absolute;
+				left: 50%;
+				top: 50%;
+				transform: translate(-50%, -50%);
+				color: rgb(84, 154, 204);
+				pointer-events: none;
+			}
+			.cm-line .em-dash-char {
+	            color: rgb(84, 154, 204);
+			}
+        `;
+        document.head.appendChild(style);
+    }
+
+	addStatusBarButton() {
+		if (!this.settings.highlightButton) return;
+
+		const statusBarItemEl = this.addStatusBarItem();
+		statusBarItemEl.id = "highlight-status-bar-button"; // Ajoutez un ID unique
+		
+		// Ajouter les classes standard d'Obsidian
+		statusBarItemEl.addClass("mod-clickable");
+		
+		// Créer la structure HTML similaire aux autres boutons
+		statusBarItemEl.innerHTML = `
+			<span class="status-bar-item-icon">¶</span>
+		`;
 	
+		// Ajouter les attributs pour le tooltip
+		statusBarItemEl.setAttribute("aria-label", "Toggle Highlight");
+		statusBarItemEl.setAttribute("data-tooltip-position", "top");
+	
+		// Mettre à jour l'apparence en fonction de l'état
+		const updateAppearance = () => {
+			statusBarItemEl.style.color = this.settings.highlightEnabled ? 'var(--interactive-accent)' : 'var(--text-muted)';
+		};
+	
+		// Initialiser l'apparence
+		updateAppearance();
+	
+		// Gérer le clic
+		statusBarItemEl.onClickEvent(() => {
+			this.toggleHighlight();
+			updateAppearance();
+		});
+	}
+
+	updateStatusBarButton() {
+		const existingButton = document.getElementById('highlight-status-bar-button');
+		if (this.settings.highlightButton) {
+			if (!existingButton) {
+				this.addStatusBarButton();
+			}
+		} else {
+			if (existingButton) {
+				existingButton.remove(); // Supprimer le bouton existant
+			}
+		}
+	}
+
+    toggleHighlight() {
+        this.settings.highlightEnabled = !this.settings.highlightEnabled;
+		this.saveSettings(); // Save the new state	
+		this.refreshDecorations();
+    }
+
+	refreshDecorations() {
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (leaf.view instanceof MarkdownView && leaf.view.editor) {
+				const editorView = (leaf.view.editor as any).cm;
+				
+				if (editorView) {
+					// Forcer un changement complet du document pour recalculer les décorations
+					editorView.dispatch({
+						changes: {
+							from: 0,
+							to: editorView.state.doc.length,
+							insert: editorView.state.doc.toString()
+						}
+					});
+				}
+			}
+		});
+	}
+
 }
 
 class FrenchTyposSettingTab extends PluginSettingTab {
@@ -273,8 +428,7 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		const titleEl = containerEl.createEl('h2', { text: 'French Typos settings' });
-		const desEl = containerEl.createEl('p', { text: 'Works mainly in Live Preview mode.' });
+		const desEl = containerEl.createEl('p', { text: 'French Typos works mainly in Live Preview mode.' });
 
 		new Setting(containerEl)
 			.setName('Apostrophe')
@@ -352,5 +506,31 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			}));
 
+
+		const desEl2 = containerEl.createEl('p', { text: 'Highlight hidden hardspaces and em dashes' });
+		desEl2.style.fontWeight = 'bold';
+	
+		new Setting(containerEl)
+		.setName('Highlight')
+		.setDesc('Enable highlight')
+		.addToggle(toggle => toggle
+			.setValue(this.plugin.settings.highlightEnabled)
+			.onChange(async (value) => {
+				// console.log("Toggling highlightEnabled to:", value);
+				this.plugin.settings.highlightEnabled = value;
+				await this.plugin.saveSettings();
+				this.plugin.refreshDecorations();
+			}));
+
+		new Setting(containerEl)
+		.setName('Highlight status bar button')
+		.setDesc('Show on/off button in status bar')
+		.addToggle(toggle => toggle
+			.setValue(this.plugin.settings.highlightButton)
+			.onChange(async (value) => {
+				this.plugin.settings.highlightButton = value;
+				await this.plugin.saveSettings();
+			}));
+	
 	}
 }

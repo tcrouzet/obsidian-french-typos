@@ -4,7 +4,10 @@
   "emdashes": true,
   "twoenters": false,
   "desactivatelinks": true,
-  "nobrcss": false,
   "hyphenate": true,
-  "emptytlines": "small"
+  "emptytlines": "small",
+  "highlightEnabled": true,
+  "highlightButton": true,
+  "hardspaces": true,
+  "nobrcss": false
 }

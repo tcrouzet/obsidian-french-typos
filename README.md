@@ -6,4 +6,6 @@ When you type Enter, two Enters appear. I suggest using this function with [Lint
 
 From command palette, you can launch **Apostrophes** to replace all the basic apostrophes in a document.
 
+You can highligt special chars (like in Ulysses or Word).
+
 On/Off buttons for all options.
