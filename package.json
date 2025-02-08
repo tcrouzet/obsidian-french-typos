@@ -1,6 +1,6 @@
 {
 	"name": "french-typos",
-	"version": "1.0.9",
+	"version": "1.0.10",
 	"description": "Automatic typographic apostrophe, French quotation marks and dialog mark",
 	"main": "main.js",
 	"scripts": {
@@ -8,10 +8,14 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
-	"keywords": ["French","typographic","keyboard"],
+	"keywords": [
+		"French",
+		"typographic",
+		"keyboard"
+	],
 	"author": "tcrouzet",
 	"license": "MIT",
-    "repository": {
+	"repository": {
 		"type": "git",
 		"url": "git://github.com/tcrouzet/obsidian-french-typos.git"
 	},
