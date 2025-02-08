@@ -6,6 +6,19 @@ When you type Enter, two Enters appear. I suggest using this function with [Lint
 
 From command palette, you can launch **Apostrophes** to replace all the basic apostrophes in a document.
 
-You can highligt special chars (like in Ulysses or Word).
+You can highligt hardspaces like in Ulysses or Word.
 
 On/Off buttons for all options.
+
+## Manual Installation
+
+1. Go to the hidden /.obsidian/plugins folder of your Obsidian vault. 
+2. Create french-typos folder there. 
+3. [Open the latest release.](https://github.com/tcrouzet/obsidian-french-typos/releases)
+4. Downloaded main.js, manifest.json and nobr.css into the french-typos folder.
+5. Restart Obsidian (palette reload).
+6. Open Obsidian's settings and find French Typos among Community plugins. Enable the plugin, it's done.
+
+PS: In MacOS Finder, use Commande (⌘) + Shift (⇧) + Point (.) to show hidden files beginning with a point.
+
+Disclaimer : This plugin is not an official Obsidian plugin.
