@@ -1,6 +1,6 @@
 {
 	"name": "french-typos",
-	"version": "1.0.10",
+	"version": "1.0.11",
 	"description": "Automatic typographic apostrophe, French quotation marks and dialog mark",
 	"main": "main.js",
 	"scripts": {
