@@ -6,7 +6,7 @@
   "desactivatelinks": true,
   "hyphenate": true,
   "emptytlines": "small",
-  "highlightEnabled": true,
+  "highlightEnabled": false,
   "highlightButton": true,
   "hardspaces": true,
   "nobrcss": false

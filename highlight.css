@@ -1,0 +1,15 @@
+.cm-line .invisible-char {
+    position: relative;
+}
+.cm-line .invisible-char::after {
+    content: '·';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: rgb(84, 154, 204);
+    pointer-events: none;
+}
+.cm-line .em-dash-char {
+    color: rgb(84, 154, 204);
+}

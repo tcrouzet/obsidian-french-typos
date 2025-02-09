@@ -127,19 +127,20 @@ export default class FrenchTypos extends Plugin {
 		}, true);
 
 		if (this.settings.emptytlines == "invisible") {
-			await this.injectCSS(this.nobrcss());
+			await this.injectCSSFromFile("nobr.css");
 		}else if (this.settings.emptytlines == "small"){
-			await this.injectCSS(this.small_interline());
+			// await this.injectCSS(this.small_interline());
+			await this.injectCSSFromFile("small_interline.css");
 		}
 
 		if (this.settings.hyphenate) {
 			await this.setLanguage();
-			await this.injectCSS(this.hyphenscss());
+			// await this.injectCSS(this.hyphenscss());
+			await this.injectCSSFromFile("hyphens.css");
 		}
 
 		// Highlighting zone
-
-		this.addStyles();
+		await this.injectCSSFromFile("highlight.css");
 
 		this.registerEditorExtension(this.createDecorations());
 
@@ -199,79 +200,19 @@ export default class FrenchTypos extends Plugin {
 		this.updateStatusBarButton();
 	}
 
-	// /Users/thierrycrouzet/Documents/ObsidianDev/.obsidian/plugins/obsidian-french-typos/nobr.css
-	async injectCSS(css: string) {
-		const styleEl = document.createElement('style');
-		styleEl.innerHTML = css;
-		document.head.appendChild(styleEl);
-    }
+	async injectCSSFromFile(fileName: string) {
+		try {
+			const pluginDir = this.manifest.dir;
+			const filePath = `${pluginDir}/${fileName}`;
 
-	nobrcss() {
-		return `
-		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header{
-			text-indent: 0rem !important;
+			const cssContent = await this.app.vault.adapter.read(filePath);
+			const styleEl = document.createElement('style');
+			styleEl.textContent = cssContent;
+			document.head.appendChild(styleEl);
+		} catch (error) {
+			console.error("Failed to load CSS file:", error);
 		}
-		
-		.markdown-source-view.mod-cm6.is-live-preview .cm-line {
-			text-indent: 2rem;
-		}
-		
-		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-1{
-			margin-bottom: 2rem !important;
-		}
-		
-		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-2{
-			margin-top: 1rem !important;
-		}
-		
-		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-3{
-			margin-top: 1rem !important;
-		}
-		
-		.markdown-source-view.mod-cm6.is-live-preview .cm-line:has(> br) {
-			display: none;
-		}
-		
-		.markdown-source-view.mod-cm6.is-live-preview .cm-active:has(> br) {
-			display: inline !important;
-		}
-		
-		.markdown-source-view.mod-cm6.is-live-preview .cm-line.HyperMD-list-line {
-			margin: 0.25rem 0;
-		}
-		`
-	}
-
-	hyphenscss() {
-		return `
-		.markdown-preview-view p {
-			text-indent: 3rem;
-			text-align: justify;
-			margin-top: 0;
-			margin-bottom: 0;
-			hyphens: auto;
-			word-wrap: break-word;
-			hyphenate-character: auto;
-		    hyphenate-limit-chars: 6 3 3;
-		}
-		`
-	}
-
-	small_interline() {
-		return `
-		.markdown-source-view.mod-cm6.is-live-preview .HyperMD-header{
-			text-indent: 0rem !important;
-		}
-
-		.markdown-source-view.mod-cm6.is-live-preview .cm-line {
-			text-indent: 2rem;
-		}
-
-		.markdown-source-view.mod-cm6.is-live-preview .cm-line:has(> br) {
-			height: 0.7rem;text-indent: 2rem;
-		}
-	`
-	}
+	  }
 
 	// Highlighting zone
 
@@ -320,28 +261,6 @@ export default class FrenchTypos extends Plugin {
         });
     }
 
-    addStyles() {
-        const style = document.createElement('style');
-        style.textContent = `
-		    .cm-line .invisible-char {
-				position: relative;
-			}
-			.cm-line .invisible-char::after {
-				content: '·';
-				position: absolute;
-				left: 50%;
-				top: 50%;
-				transform: translate(-50%, -50%);
-				color: rgb(84, 154, 204);
-				pointer-events: none;
-			}
-			.cm-line .em-dash-char {
-	            color: rgb(84, 154, 204);
-			}
-        `;
-        document.head.appendChild(style);
-    }
-
 	addStatusBarButton() {
 		if (!this.settings.highlightButton) return;
 
@@ -352,17 +271,18 @@ export default class FrenchTypos extends Plugin {
 		statusBarItemEl.addClass("mod-clickable");
 		
 		// Créer la structure HTML similaire aux autres boutons
-		statusBarItemEl.innerHTML = `
-			<span class="status-bar-item-icon">¶</span>
-		`;
-	
+		const iconSpan = document.createElement('span');
+		iconSpan.classList.add('status-bar-item-icon');
+		iconSpan.textContent = '¶';
+		statusBarItemEl.appendChild(iconSpan);
+
 		// Ajouter les attributs pour le tooltip
 		statusBarItemEl.setAttribute("aria-label", "Toggle Highlight");
 		statusBarItemEl.setAttribute("data-tooltip-position", "top");
 	
 		// Mettre à jour l'apparence en fonction de l'état
 		const updateAppearance = () => {
-			statusBarItemEl.style.color = this.settings.highlightEnabled ? 'var(--interactive-accent)' : 'var(--text-muted)';
+			statusBarItemEl.toggleClass('highlight-enabled', this.settings.highlightEnabled);
 		};
 	
 		// Initialiser l'apparence
@@ -397,7 +317,7 @@ export default class FrenchTypos extends Plugin {
 	refreshDecorations() {
 		this.app.workspace.iterateAllLeaves((leaf) => {
 			if (leaf.view instanceof MarkdownView && leaf.view.editor) {
-				const editorView = (leaf.view.editor as any).cm;
+				const editorView = (leaf.view.editor as any).cm as EditorView;
 				
 				if (editorView) {
 					// Forcer un changement complet du document pour recalculer les décorations
@@ -428,7 +348,7 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		const desEl = containerEl.createEl('p', { text: 'French Typos works mainly in Live Preview mode.' });
+		containerEl.createEl('p', { text: 'French Typos works mainly in Live Preview mode.' });
 
 		new Setting(containerEl)
 			.setName('Apostrophe')
