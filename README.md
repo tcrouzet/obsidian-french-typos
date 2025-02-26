@@ -15,7 +15,7 @@ On/Off buttons for all options.
 1. Go to the hidden /.obsidian/plugins folder of your Obsidian vault. 
 2. Create french-typos folder there. 
 3. [Open the latest release.](https://github.com/tcrouzet/obsidian-french-typos/releases)
-4. Downloaded main.js, manifest.json and nobr.css into the french-typos folder.
+4. Downloaded main.js, manifest.json and *all css files into the french-typos folder.
 5. Restart Obsidian (palette reload).
 6. Open Obsidian's settings and find French Typos among Community plugins. Enable the plugin, it's done.
 

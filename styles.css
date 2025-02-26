@@ -1,0 +1,77 @@
+/* styles.css */
+
+/* Styles pour les lignes vides invisibles */
+body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .HyperMD-header{
+    text-indent: 0rem !important;
+}
+
+body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .cm-line {
+    text-indent: 2rem;
+}
+
+body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-1{
+    margin-bottom: 2rem !important;
+}
+
+body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-2{
+    margin-top: 1rem !important;
+}
+
+body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-3{
+    margin-top: 1rem !important;
+}
+
+body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .cm-line:has(> br) {
+    display: none;
+}
+
+body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .cm-active:has(> br) {
+    display: inline !important;
+}
+
+body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .cm-line.HyperMD-list-line {
+    margin: 0.25rem 0;
+}
+
+
+/* highlight */
+body.french-typos-highlight .cm-line .invisible-char {
+    position: relative;
+}
+body.french-typos-highlight .cm-line .invisible-char::after {
+    content: '·';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: rgb(84, 154, 204);
+    pointer-events: none;
+}
+body.french-typos-highlight .cm-line .em-dash-char {
+    color: rgb(84, 154, 204);
+}
+
+
+/* small_interline */
+body.french-typos-small_interline .markdown-source-view.mod-cm6.is-live-preview .HyperMD-header{
+    text-indent: 0rem !important;
+}
+body.french-typos-small_interline .markdown-source-view.mod-cm6.is-live-preview .cm-line {
+    text-indent: 2rem;
+}
+body.french-typos-small_interline .markdown-source-view.mod-cm6.is-live-preview .cm-line:has(> br) {
+    height: 0.7rem;text-indent: 2rem;
+}
+
+/* french hyphens */
+body.french-typos-hyphens .markdown-preview-view p {
+    text-indent: 3rem;
+    text-align: justify;
+    margin-top: 0;
+    margin-bottom: 0;
+    hyphens: auto;
+    word-wrap: break-word;
+    hyphenate-character: auto;
+    hyphenate-limit-chars: 6 3 3;
+}
+

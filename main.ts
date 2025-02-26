@@ -1,7 +1,12 @@
-import { App, Editor, MarkdownView, PluginSettingTab, Plugin, Setting, TFile } from 'obsidian';
+import { App, Editor, MarkdownView, PluginSettingTab, Plugin, Setting, Component, TFile } from 'obsidian';
 import { EditorView, Decoration, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 
+declare module "obsidian" {
+    interface Plugin {
+        addStyle(css: string): void;
+    }
+}
 
 interface FrenchTyposSettings {
 	apostrophe: boolean;
@@ -127,25 +132,23 @@ export default class FrenchTypos extends Plugin {
 		}, true);
 
 		if (this.settings.emptytlines == "invisible") {
-			await this.injectCSSFromFile("nobr.css");
+			document.body.classList.add('french-typos-nobr');
 		}else if (this.settings.emptytlines == "small"){
-			// await this.injectCSS(this.small_interline());
-			await this.injectCSSFromFile("small_interline.css");
+			document.body.classList.add('french-typos-small_interline');
 		}
 
 		if (this.settings.hyphenate) {
 			await this.setLanguage();
-			// await this.injectCSS(this.hyphenscss());
-			await this.injectCSSFromFile("hyphens.css");
+			document.body.classList.add('french-typos-hyphens');
 		}
 
 		// Highlighting zone
-		await this.injectCSSFromFile("highlight.css");
+		document.body.classList.add('french-typos-highlight');
+
 
 		this.registerEditorExtension(this.createDecorations());
 
         // Add a status bar item
-        // this.addStatusBarButton();
 		this.updateStatusBarButton();
 
 	}
@@ -199,20 +202,6 @@ export default class FrenchTypos extends Plugin {
 		await this.saveData(this.settings);
 		this.updateStatusBarButton();
 	}
-
-	async injectCSSFromFile(fileName: string) {
-		try {
-			const pluginDir = this.manifest.dir;
-			const filePath = `${pluginDir}/${fileName}`;
-
-			const cssContent = await this.app.vault.adapter.read(filePath);
-			const styleEl = document.createElement('style');
-			styleEl.textContent = cssContent;
-			document.head.appendChild(styleEl);
-		} catch (error) {
-			console.error("Failed to load CSS file:", error);
-		}
-	  }
 
 	// Highlighting zone
 
@@ -277,7 +266,7 @@ export default class FrenchTypos extends Plugin {
 		statusBarItemEl.appendChild(iconSpan);
 
 		// Ajouter les attributs pour le tooltip
-		statusBarItemEl.setAttribute("aria-label", "Toggle Highlight");
+		statusBarItemEl.setAttribute("aria-label", "Toggle highlight");
 		statusBarItemEl.setAttribute("data-tooltip-position", "top");
 	
 		// Mettre à jour l'apparence en fonction de l'état
@@ -331,6 +320,49 @@ export default class FrenchTypos extends Plugin {
 				}
 			}
 		});
+	}
+
+	hardspaces(content: string) {
+		// Extraire les sections HTML et YAML
+		const htmlRegex = /<[^>]*>/g;
+		const yamlRegex = /---[\s\S]+?---/g;
+	
+		let htmlMatches = content.match(htmlRegex) || [];
+		let yamlMatches = content.match(yamlRegex) || [];
+	
+		// Remplacer ces sections par des marqueurs temporaires
+		content = content.replace(htmlRegex, 'HTML_PLACEHOLDER');
+		content = content.replace(yamlRegex, 'YAML_PLACEHOLDER');
+	
+		// Appliquer les règles d'espacement
+		let regex = /(.)([:;?!»])/g;
+		content = content.replace(regex, (match, p1, p2) => {
+			if (p1 === ' ' || p1 === '\u00A0') {
+				return '\u00A0' + p2;
+			}
+			return p1 + '\u00A0' + p2;
+		});
+	
+		regex = /([«—])(.)?/g;
+		content = content.replace(regex, (match, p1, p2) => {
+			if (p2 === ' ' || p2 === '\u00A0') {
+				return p1 + '\u00A0';
+			}
+			return p1 + '\u00A0' + p2;
+		});
+	
+		// Réintégrer les sections HTML et YAML
+		htmlMatches.forEach(placeholder => {
+			content = content.replace('HTML_PLACEHOLDER', placeholder);
+		});
+		yamlMatches.forEach(placeholder => {
+			content = content.replace('YAML_PLACEHOLDER', placeholder);
+		});
+
+		// No Hard space in notes
+		content = content.replace("]\u00A0:", "]:");
+	
+		return content;
 	}
 
 }
@@ -391,7 +423,7 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 			}));
 
 		new Setting(containerEl)
-		.setName('Simulate Shift+Clic on links')
+		.setName('Simulate Shift+Click on links')
 		.setDesc('Display the URL instead of opening')
 		.addToggle(toggle => toggle
 			.setValue(this.plugin.settings.desactivatelinks)
@@ -426,9 +458,7 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			}));
 
-
-		const desEl2 = containerEl.createEl('p', { text: 'Highlight hidden hardspaces and em dashes' });
-		desEl2.style.fontWeight = 'bold';
+		new Setting(containerEl).setName('Highlight hidden hardspaces and em dashes').setHeading();
 	
 		new Setting(containerEl)
 		.setName('Highlight')
