@@ -47,8 +47,11 @@ body.french-typos-highlight .cm-line .invisible-char::after {
     color: rgb(84, 154, 204);
     pointer-events: none;
 }
-body.french-typos-highlight .cm-line .em-dash-char {
+body.french-typos-highlight .cm-line .en-dash-char {
     color: rgb(84, 154, 204);
+}
+body.french-typos-highlight .cm-line .em-dash-char {
+    color: rgb(107, 2, 2);
 }
 
 

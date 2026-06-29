@@ -219,6 +219,11 @@ export default class FrenchTypos extends Plugin {
 	    const emDashDecoration = Decoration.mark({
 			class: 'em-dash-char'
 		});
+
+	    const enDashDecoration = Decoration.mark({
+			class: 'en-dash-char'
+		});
+
 		const plugin = this;
 
         return ViewPlugin.fromClass(class {
@@ -247,7 +252,7 @@ export default class FrenchTypos extends Plugin {
 								builder.add(from + i, from + i + 1, emDashDecoration);
 							}
 							if (text[i] === '–') { // Unicode for en dash
-								builder.add(from + i, from + i + 1, emDashDecoration);
+								builder.add(from + i, from + i + 1, enDashDecoration);
 							}
 						}
 					}
