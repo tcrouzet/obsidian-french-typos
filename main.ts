@@ -12,6 +12,7 @@ interface FrenchTyposSettings {
 	apostrophe: boolean;
 	quotationmarks: boolean;
 	emdashes: boolean;
+	endashes: boolean;
 	twoenters: boolean;
 	desactivatelinks: boolean;
 	hyphenate: boolean;
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	apostrophe: true,
 	quotationmarks: true,
 	emdashes: true,
+	endashes: true,
 	twoenters: false,
 	desactivatelinks: true,
 	hyphenate: true,
@@ -85,9 +87,13 @@ export default class FrenchTypos extends Plugin {
 					editor.setCursor({ line: cursor.line, ch: cursor.ch + 2 });
 					this.openQuote = !this.openQuote;
 
+				} else if (event.key === ' ' && editor.getRange({ line: cursor.line, ch: cursor.ch - 3 }, cursor) === '---' && this.settings.emdashes) {
+					event.preventDefault();
+					editor.replaceRange("— ", { line: cursor.line, ch: cursor.ch - 3 }, { line: cursor.line, ch: cursor.ch });
+				
 				} else if (event.key === ' ' && editor.getRange({ line: cursor.line, ch: cursor.ch - 2 }, cursor) === '--' && this.settings.emdashes) {
 					event.preventDefault();
-					editor.replaceRange("— ", { line: cursor.line, ch: cursor.ch - 2 }, { line: cursor.line, ch: cursor.ch });
+					editor.replaceRange("– ", { line: cursor.line, ch: cursor.ch - 2 }, { line: cursor.line, ch: cursor.ch });
 				
 				} else if (event.key === 'Enter'  && this.settings.twoenters) {
 					event.preventDefault();
@@ -238,6 +244,9 @@ export default class FrenchTypos extends Plugin {
 								builder.add(from + i, from + i + 1, invisibleCharDecoration);
 							}
 							if (text[i] === '—') { // Unicode for em dash
+								builder.add(from + i, from + i + 1, emDashDecoration);
+							}
+							if (text[i] === '–') { // Unicode for en dash
 								builder.add(from + i, from + i + 1, emDashDecoration);
 							}
 						}
@@ -403,12 +412,22 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 			}));
 	
 		new Setting(containerEl)
-		.setName('Em dashes')
-		.setDesc('Convert "-- " into em dashes')
+		.setName('Em dashes (quadratin)')
+		.setDesc('Convert "--- " into em dashes —')
 		.addToggle(toggle => toggle
 			.setValue(this.plugin.settings.emdashes)
 			.onChange(async (value) => {
 				this.plugin.settings.emdashes = value;
+				await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+		.setName('En dashes (demi-quadratin)')
+		.setDesc('Convert "-- " into en dashes –')
+		.addToggle(toggle => toggle
+			.setValue(this.plugin.settings.endashes)
+			.onChange(async (value) => {
+				this.plugin.settings.endashes = value;
 				await this.plugin.saveSettings();
 			}));
 
