@@ -1,11 +1,11 @@
 {
-	"id": "french-typos",
-	"name": "French Typos",
-	"version": "1.0.14",
-	"minAppVersion": "1.14.0",
-	"description": "Automatic typographic apostrophe, French quotation marks and dialog mark.",
-	"author": "Thierry Crouzet",
-	"authorUrl": "https://tcrouzet.com",
-	"fundingUrl": {},
-	"isDesktopOnly": false
+  "id": "french-typos",
+  "name": "French Typos",
+  "version": "1.0.15",
+  "minAppVersion": "1.14.0",
+  "description": "Automatic typographic apostrophe, French quotation marks and dialog mark.",
+  "author": "Thierry Crouzet",
+  "authorUrl": "https://tcrouzet.com",
+  "fundingUrl": {},
+  "isDesktopOnly": false
 }
