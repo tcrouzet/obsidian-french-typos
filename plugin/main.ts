@@ -41,7 +41,7 @@ export default class FrenchTypos extends Plugin {
 	private openQuote: boolean = true; // Variable pour suivre l'état des guillemets
 
 	async onload() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		await this.loadSettings();
 
 		this.addSettingTab(new FrenchTyposSettingTab(this.app, this));
 
@@ -203,7 +203,20 @@ export default class FrenchTypos extends Plugin {
     }
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const data: unknown = await this.loadData();
+		this.settings = { ...DEFAULT_SETTINGS };
+		if (typeof data !== 'object' || data === null) return;
+
+		for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof FrenchTyposSettings)[]) {
+			const value = (data as Record<string, unknown>)[key];
+			if (key === 'emptytlines') {
+				if (value === 'normal' || value === 'small' || value === 'invisible') {
+					this.settings.emptytlines = value;
+				}
+			} else if (typeof value === 'boolean') {
+				this.settings[key] = value;
+			}
+		}
 	}
 
 	async saveSettings() {
@@ -272,7 +285,7 @@ export default class FrenchTypos extends Plugin {
 		statusBarItemEl.addClass("mod-clickable");
 		
 		// Créer la structure HTML similaire aux autres boutons
-		statusBarItemEl.createEl('span', { cls: 'status-bar-item-icon', text: '¶' });
+		statusBarItemEl.createSpan({ cls: 'status-bar-item-icon', text: '¶' });
 
 		// Ajouter les attributs pour le tooltip
 		statusBarItemEl.setAttribute("aria-label", "Toggle highlight");
@@ -308,7 +321,7 @@ export default class FrenchTypos extends Plugin {
 
     toggleHighlight() {
         this.settings.highlightEnabled = !this.settings.highlightEnabled;
-		this.saveSettings(); // Save the new state	
+		void this.saveSettings();
 		this.refreshDecorations();
     }
 

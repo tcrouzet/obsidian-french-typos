@@ -9,19 +9,21 @@ const source = readFileSync('plugin/main.ts', 'utf8');
 const linter = new Linter();
 linter.defineParser('@typescript-eslint/parser', require('@typescript-eslint/parser'));
 const rules = require('@typescript-eslint/eslint-plugin').rules;
-for (const name of ['no-this-alias', 'no-explicit-any', 'no-unused-vars']) {
+for (const name of ['no-this-alias', 'no-explicit-any', 'no-unused-vars', 'no-unsafe-assignment', 'no-floating-promises']) {
 	linter.defineRule('@typescript-eslint/' + name, rules[name]);
 }
 assert.deepEqual(linter.verify(source, {
 	parser: '@typescript-eslint/parser',
-	parserOptions: { ecmaVersion: 2020, sourceType: 'module' },
+	parserOptions: { ecmaVersion: 2020, sourceType: 'module', project: './tsconfig.json', tsconfigRootDir: process.cwd() },
 	rules: {
 		'@typescript-eslint/no-this-alias': 'error',
 		'@typescript-eslint/no-explicit-any': 'error',
-		'@typescript-eslint/no-unused-vars': 'error'
+		'@typescript-eslint/no-unused-vars': 'error',
+		'@typescript-eslint/no-unsafe-assignment': 'error',
+		'@typescript-eslint/no-floating-promises': 'error'
 	}
 }, 'plugin/main.ts'), []);
-console.log('Source lint: no this alias, explicit any or unused variables.');
+console.log('Source lint: no this alias, explicit any, unused variables, unsafe assignments or floating promises.');
 
 class MarkdownView {}
 const moduleForCheck = { exports: {} };
@@ -103,3 +105,37 @@ assert.equal(settings.filter(definition => definition.control).map(definition =>
 assert.equal(typeof settings.find(definition => definition.name === 'Highlight').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'Highlight status bar button').render, 'function');
 console.log('Settings search: existing settings are declared and highlight callbacks remain available.');
+
+async function checkLoadedSettings() {
+	const defaults = {
+		apostrophe: true, quotationmarks: true, emdashes: true, endashes: true,
+		twoenters: false, desactivatelinks: true, hyphenate: true, emptytlines: 'small',
+		highlightEnabled: true, highlightButton: true
+	};
+	for (const data of [null, undefined, [], 'invalid', 42, { apostrophe: 'false', emptytlines: 'invalid' }]) {
+		plugin.loadData = async () => data;
+		await plugin.loadSettings();
+		assert.deepEqual({ ...plugin.settings }, defaults);
+	}
+	for (const emptytlines of ['normal', 'small', 'invisible']) {
+		const saved = {
+			apostrophe: false, quotationmarks: false, emdashes: false, endashes: false,
+			twoenters: true, desactivatelinks: false, hyphenate: false, emptytlines,
+			highlightEnabled: false, highlightButton: false
+		};
+		plugin.loadData = async () => saved;
+		await plugin.loadSettings();
+		assert.deepEqual({ ...plugin.settings }, saved);
+	}
+	plugin.loadData = async () => ({ apostrophe: false });
+	await plugin.loadSettings();
+	assert.deepEqual({ ...plugin.settings }, { ...defaults, apostrophe: false });
+	plugin.loadData = async () => { throw new Error('Cannot read settings'); };
+	await assert.rejects(() => plugin.loadSettings(), /Cannot read settings/);
+	console.log('Settings loading: saved values preserved; missing or invalid values use defaults; read errors propagate.');
+}
+
+checkLoadedSettings().catch(error => {
+	console.error(error);
+	process.exitCode = 1;
+});
