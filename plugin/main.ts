@@ -1,6 +1,8 @@
-import { App, Editor, MarkdownView, PluginSettingTab, Plugin, Setting, Component, TFile } from 'obsidian';
-import { EditorView, Decoration, ViewPlugin, ViewUpdate } from '@codemirror/view';
-import { RangeSetBuilder } from '@codemirror/state';
+import { App, Editor, MarkdownView, PluginSettingTab, Plugin, SettingDefinitionItem } from 'obsidian';
+import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate } from '@codemirror/view';
+import { RangeSetBuilder, StateEffect } from '@codemirror/state';
+
+const refreshHighlight = StateEffect.define<null>();
 
 declare module "obsidian" {
     interface Plugin {
@@ -46,7 +48,7 @@ export default class FrenchTypos extends Plugin {
 		this.addCommand({
 			id: 'Apostrophes',
 			name: 'Apostrophes',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
+			editorCallback: (editor: Editor) => {
 				this.updateApostrophes(editor);
 			}
 		});
@@ -60,7 +62,7 @@ export default class FrenchTypos extends Plugin {
 
 			const activeState = this.app.workspace.getLeaf().getViewState().state
 
-			if (activeView && activeView.getMode() === 'source' && activeState["source"] === false) {
+			if (activeView && activeView.getMode() === 'source' && activeState?.["source"] === false) {
 				const editor = activeView.editor;
 				const cursor = editor.getCursor();
 
@@ -126,7 +128,7 @@ export default class FrenchTypos extends Plugin {
 			const activeState = this.app.workspace.getLeaf().getViewState().state;
 		
 			// Empêcher l'ouverture des liens cm-link
-			if (activeView && activeView.getMode() === 'source' && activeState["source"] === false && parent.classList.contains('cm-link') && this.settings.desactivatelinks) {
+			if (activeView && activeView.getMode() === 'source' && activeState?.["source"] === false && parent.classList.contains('cm-link') && this.settings.desactivatelinks) {
 				event.preventDefault();
 				event.stopPropagation();
 				const editor = activeView.editor;
@@ -211,58 +213,54 @@ export default class FrenchTypos extends Plugin {
 
 	// Highlighting zone
 
-    createDecorations() {
-        const invisibleCharDecoration = Decoration.mark({
-            class: 'invisible-char'
-        });
+	createDecorations() {
+		const invisibleCharDecoration = Decoration.mark({ class: 'invisible-char' });
+		const emDashDecoration = Decoration.mark({ class: 'em-dash-char' });
+		const enDashDecoration = Decoration.mark({ class: 'en-dash-char' });
+		const emptyLineDecoration = Decoration.line({ class: 'french-typos-empty-line' });
+		const highlightEnabled = () => this.settings.highlightEnabled;
 
-	    const emDashDecoration = Decoration.mark({
-			class: 'em-dash-char'
-		});
+		return ViewPlugin.fromClass(class {
+			decorations: DecorationSet;
 
-	    const enDashDecoration = Decoration.mark({
-			class: 'en-dash-char'
-		});
+			constructor(view: EditorView) {
+				this.decorations = this.buildDecorations(view);
+			}
 
-		const plugin = this;
+			update(update: ViewUpdate) {
+				if (update.docChanged || update.viewportChanged || update.transactions.some(transaction =>
+					transaction.effects.some(effect => effect.is(refreshHighlight)))) {
+					this.decorations = this.buildDecorations(update.view);
+				}
+			}
 
-        return ViewPlugin.fromClass(class {
-            decorations: any;
-
-            constructor(view: EditorView) {
-                this.decorations = this.buildDecorations(view);
-            }
-
-            update(update: ViewUpdate) {
-                if (update.docChanged || update.viewportChanged) {
-                    this.decorations = this.buildDecorations(update.view);
-                }
-            }
-
-            buildDecorations(view: EditorView) {
-                const builder = new RangeSetBuilder<Decoration>();
-				if (plugin.settings.highlightEnabled) {
-					for (let { from, to } of view.visibleRanges) {
-						let text = view.state.doc.sliceString(from, to);
-						for (let i = 0; i < text.length; i++) {
-							if (text[i] === '\u00A0') { // Unicode for non-breaking space
-								builder.add(from + i, from + i + 1, invisibleCharDecoration);
-							}
-							if (text[i] === '—') { // Unicode for em dash
-								builder.add(from + i, from + i + 1, emDashDecoration);
-							}
-							if (text[i] === '–') { // Unicode for en dash
-								builder.add(from + i, from + i + 1, enDashDecoration);
-							}
+			buildDecorations(view: EditorView) {
+				const builder = new RangeSetBuilder<Decoration>();
+				const enabled = highlightEnabled();
+				for (const { from, to } of view.visibleRanges) {
+					const text = view.state.doc.sliceString(from, to);
+					for (let i = 0; i <= text.length; i++) {
+						if ((i === 0 || text[i - 1] === '\n') && view.state.doc.lineAt(from + i).length === 0) {
+							builder.add(from + i, from + i, emptyLineDecoration);
+						}
+						if (!enabled) continue;
+						if (text[i] === '\u00A0') {
+							builder.add(from + i, from + i + 1, invisibleCharDecoration);
+						}
+						if (text[i] === '—') {
+							builder.add(from + i, from + i + 1, emDashDecoration);
+						}
+						if (text[i] === '–') {
+							builder.add(from + i, from + i + 1, enDashDecoration);
 						}
 					}
 				}
-                return builder.finish();
-            }
-        }, {
-            decorations: v => v.decorations
-        });
-    }
+				return builder.finish();
+			}
+		}, {
+			decorations: value => value.decorations
+		});
+	}
 
 	addStatusBarButton() {
 		if (!this.settings.highlightButton) return;
@@ -274,10 +272,7 @@ export default class FrenchTypos extends Plugin {
 		statusBarItemEl.addClass("mod-clickable");
 		
 		// Créer la structure HTML similaire aux autres boutons
-		const iconSpan = document.createElement('span');
-		iconSpan.classList.add('status-bar-item-icon');
-		iconSpan.textContent = '¶';
-		statusBarItemEl.appendChild(iconSpan);
+		statusBarItemEl.createEl('span', { cls: 'status-bar-item-icon', text: '¶' });
 
 		// Ajouter les attributs pour le tooltip
 		statusBarItemEl.setAttribute("aria-label", "Toggle highlight");
@@ -320,16 +315,11 @@ export default class FrenchTypos extends Plugin {
 	refreshDecorations() {
 		this.app.workspace.iterateAllLeaves((leaf) => {
 			if (leaf.view instanceof MarkdownView && leaf.view.editor) {
-				const editorView = (leaf.view.editor as any).cm as EditorView;
+				const editorView = (leaf.view.editor as Editor & { cm?: EditorView }).cm;
 				
 				if (editorView) {
-					// Forcer un changement complet du document pour recalculer les décorations
 					editorView.dispatch({
-						changes: {
-							from: 0,
-							to: editorView.state.doc.length,
-							insert: editorView.state.doc.toString()
-						}
+						effects: refreshHighlight.of(null)
 					});
 				}
 			}
@@ -389,122 +379,86 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		containerEl.createEl('p', { text: 'French Typos works mainly in Live Preview mode.' });
-
-		new Setting(containerEl)
-			.setName('Apostrophe')
-			.setDesc('Activate typographic apostrophe')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.apostrophe)
-				.onChange(async (value) => {
-					this.plugin.settings.apostrophe = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-		.setName('French quotation marks and hard spaces')
-		.setDesc('Convert standard quotation marks')
-		.addToggle(toggle => toggle
-			.setValue(this.plugin.settings.quotationmarks)
-			.onChange(async (value) => {
-				this.plugin.settings.quotationmarks = value;
-				await this.plugin.saveSettings();
-			}));
-	
-		new Setting(containerEl)
-		.setName('Em dashes (quadratin)')
-		.setDesc('Convert "--- " into em dashes —')
-		.addToggle(toggle => toggle
-			.setValue(this.plugin.settings.emdashes)
-			.onChange(async (value) => {
-				this.plugin.settings.emdashes = value;
-				await this.plugin.saveSettings();
-			}));
-
-		new Setting(containerEl)
-		.setName('En dashes (demi-quadratin)')
-		.setDesc('Convert "-- " into en dashes –')
-		.addToggle(toggle => toggle
-			.setValue(this.plugin.settings.endashes)
-			.onChange(async (value) => {
-				this.plugin.settings.endashes = value;
-				await this.plugin.saveSettings();
-			}));
-
-		new Setting(containerEl)
-		.setName('Two Enters for one')
-		.setDesc('One Enter create a Markdown paragraph')
-		.addToggle(toggle => toggle
-			.setValue(this.plugin.settings.twoenters)
-			.onChange(async (value) => {
-				this.plugin.settings.twoenters = value;
-				await this.plugin.saveSettings();
-			}));
-
-		new Setting(containerEl)
-		.setName('Simulate Shift+Click on links')
-		.setDesc('Display the URL instead of opening')
-		.addToggle(toggle => toggle
-			.setValue(this.plugin.settings.desactivatelinks)
-			.onChange(async (value) => {
-				this.plugin.settings.desactivatelinks = value;
-				await this.plugin.saveSettings();
-			}));
-
-		new Setting(containerEl)
-		.setName('Empty lines')
-		.setDesc('Reload your Vault to process…')
-		.addDropdown(dropdown => {
-			dropdown.addOptions({
-				'normal': 'Normal',
-				'small': 'Small',
-				'invisible': 'Invisible'
-			});
-			dropdown.setValue(this.plugin.settings.emptytlines);
-			dropdown.onChange(async (value) => {
-				this.plugin.settings.emptytlines = value;
-				await this.plugin.saveSettings();
-			});
-		});
-	
-		new Setting(containerEl)
-		.setName('Hyphenate French rules')
-		.setDesc('Only in Reading view (reload your Vault to process)')
-		.addToggle(toggle => toggle
-			.setValue(this.plugin.settings.hyphenate)
-			.onChange(async (value) => {
-				this.plugin.settings.hyphenate = value;
-				await this.plugin.saveSettings();
-			}));
-
-		new Setting(containerEl).setName('Highlight hidden hardspaces and em dashes').setHeading();
-	
-		new Setting(containerEl)
-		.setName('Highlight')
-		.setDesc('Enable highlight')
-		.addToggle(toggle => toggle
-			.setValue(this.plugin.settings.highlightEnabled)
-			.onChange(async (value) => {
-				// console.log("Toggling highlightEnabled to:", value);
-				this.plugin.settings.highlightEnabled = value;
-				await this.plugin.saveSettings();
-				this.plugin.refreshDecorations();
-			}));
-
-		new Setting(containerEl)
-		.setName('Highlight status bar button')
-		.setDesc('Show on/off button in status bar')
-		.addToggle(toggle => toggle
-			.setValue(this.plugin.settings.highlightButton)
-			.onChange(async (value) => {
-				this.plugin.settings.highlightButton = value;
-				await this.plugin.saveSettings();
-			}));
-	
+	getSettingDefinitions(): SettingDefinitionItem<keyof FrenchTyposSettings>[] {
+		return [
+			{
+				name: 'French Typos works mainly in Live Preview mode.'
+			},
+			{
+				name: 'Apostrophe',
+				desc: 'Activate typographic apostrophe',
+				control: { type: 'toggle', key: 'apostrophe' }
+			},
+			{
+				name: 'French quotation marks and hard spaces',
+				desc: 'Convert standard quotation marks',
+				control: { type: 'toggle', key: 'quotationmarks' }
+			},
+			{
+				name: 'Em dashes (quadratin)',
+				desc: 'Convert "--- " into em dashes —',
+				control: { type: 'toggle', key: 'emdashes' }
+			},
+			{
+				name: 'En dashes (demi-quadratin)',
+				desc: 'Convert "-- " into en dashes –',
+				control: { type: 'toggle', key: 'endashes' }
+			},
+			{
+				name: 'Two Enters for one',
+				desc: 'One Enter create a Markdown paragraph',
+				control: { type: 'toggle', key: 'twoenters' }
+			},
+			{
+				name: 'Simulate Shift+Click on links',
+				desc: 'Display the URL instead of opening',
+				control: { type: 'toggle', key: 'desactivatelinks' }
+			},
+			{
+				name: 'Empty lines',
+				desc: 'Reload your Vault to process…',
+				control: {
+					type: 'dropdown',
+					key: 'emptytlines',
+					options: { normal: 'Normal', small: 'Small', invisible: 'Invisible' }
+				}
+			},
+			{
+				name: 'Hyphenate French rules',
+				desc: 'Only in Reading view (reload your Vault to process)',
+				control: { type: 'toggle', key: 'hyphenate' }
+			},
+			{
+				type: 'group',
+				heading: 'Highlight hidden hardspaces and em dashes',
+				items: [
+					{
+						name: 'Highlight',
+						desc: 'Enable highlight',
+						render: setting => {
+							setting.addToggle(toggle => toggle
+								.setValue(this.plugin.settings.highlightEnabled)
+								.onChange(async value => {
+									this.plugin.settings.highlightEnabled = value;
+									await this.plugin.saveSettings();
+									this.plugin.refreshDecorations();
+								}));
+						}
+					},
+					{
+						name: 'Highlight status bar button',
+						desc: 'Show on/off button in status bar',
+						render: setting => {
+							setting.addToggle(toggle => toggle
+								.setValue(this.plugin.settings.highlightButton)
+								.onChange(async value => {
+									this.plugin.settings.highlightButton = value;
+									await this.plugin.saveSettings();
+								}));
+						}
+					}
+				]
+			}
+		];
 	}
 }

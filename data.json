@@ -2,12 +2,13 @@
   "apostrophe": true,
   "quotationmarks": true,
   "emdashes": true,
+  "endashes": true,
   "twoenters": false,
   "desactivatelinks": true,
   "hyphenate": true,
   "emptytlines": "small",
   "highlightEnabled": true,
-  "highlightButton": true,
+  "highlightButton": false,
   "hardspaces": true,
   "nobrcss": false
 }
