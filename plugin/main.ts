@@ -12,12 +12,14 @@ declare module "obsidian" {
 
 interface FrenchTyposSettings {
 	apostrophe: boolean;
+	doubleApostropheQuotes: boolean;
 	quotationmarks: boolean;
 	emdashes: boolean;
 	endashes: boolean;
 	twoenters: boolean;
 	desactivatelinks: boolean;
 	hyphenate: boolean;
+	firstLineIndent: boolean;
 	emptytlines: string;
 	highlightEnabled: boolean;
 	highlightButton: boolean;
@@ -25,15 +27,22 @@ interface FrenchTyposSettings {
 
 const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	apostrophe: true,
+	doubleApostropheQuotes: false,
 	quotationmarks: true,
 	emdashes: true,
 	endashes: true,
 	twoenters: false,
 	desactivatelinks: true,
 	hyphenate: true,
+	firstLineIndent: true,
 	emptytlines: 'small',
 	highlightEnabled: true,
 	highlightButton: true,
+}
+
+function doubleApostropheQuote(beforeCursor: string): string | null {
+	if (!beforeCursor.endsWith("'") && !beforeCursor.endsWith("’")) return null;
+	return beforeCursor.lastIndexOf('“') > beforeCursor.lastIndexOf('”') ? '”' : '“';
 }
 
 export default class FrenchTypos extends Plugin {
@@ -42,6 +51,8 @@ export default class FrenchTypos extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		this.updateFirstLineIndent();
+		this.register(() => document.body.classList.remove('french-typos-indent'));
 
 		this.addSettingTab(new FrenchTyposSettingTab(this.app, this));
 
@@ -65,8 +76,15 @@ export default class FrenchTypos extends Plugin {
 			if (activeView && activeView.getMode() === 'source' && activeState?.["source"] === false) {
 				const editor = activeView.editor;
 				const cursor = editor.getCursor();
+				const quote = (event.key === "'" || event.key === '’') && this.settings.doubleApostropheQuotes && !editor.getSelection()
+					? doubleApostropheQuote(editor.getRange({ line: 0, ch: 0 }, cursor))
+					: null;
 
-				if (event.key === "'" && this.settings.apostrophe) {
+				if (quote) {
+					event.preventDefault();
+					editor.replaceRange(quote, { line: cursor.line, ch: cursor.ch - 1 }, cursor);
+					editor.setCursor(cursor);
+				} else if (event.key === "'" && this.settings.apostrophe) {
 					event.preventDefault();
 					const selection = editor.getSelection();
 				
@@ -221,7 +239,12 @@ export default class FrenchTypos extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.updateFirstLineIndent();
 		this.updateStatusBarButton();
+	}
+
+	updateFirstLineIndent() {
+		document.body.classList.toggle('french-typos-indent', this.settings.firstLineIndent);
 	}
 
 	// Highlighting zone
@@ -403,6 +426,11 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 				control: { type: 'toggle', key: 'apostrophe' }
 			},
 			{
+				name: 'Double apostrophes to curly quotes',
+				desc: 'Convert two consecutive apostrophes into “ or ”, closing an already open quote',
+				control: { type: 'toggle', key: 'doubleApostropheQuotes' }
+			},
+			{
 				name: 'French quotation marks and hard spaces',
 				desc: 'Convert standard quotation marks',
 				control: { type: 'toggle', key: 'quotationmarks' }
@@ -426,6 +454,18 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 				name: 'Simulate Shift+Click on links',
 				desc: 'Display the URL instead of opening',
 				control: { type: 'toggle', key: 'desactivatelinks' }
+			},
+			{
+				name: 'First line indent',
+				desc: 'Indent the first line of paragraphs in Live Preview and Reading view',
+				render: setting => {
+					setting.addToggle(toggle => toggle
+						.setValue(this.plugin.settings.firstLineIndent)
+						.onChange(async value => {
+							this.plugin.settings.firstLineIndent = value;
+							await this.plugin.saveSettings();
+						}));
+				}
 			},
 			{
 				name: 'Empty lines',

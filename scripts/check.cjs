@@ -27,7 +27,7 @@ console.log('Source lint: no this alias, explicit any, unused variables, unsafe 
 
 class MarkdownView {}
 const moduleForCheck = { exports: {} };
-runInNewContext(transformSync(source + '\nexport { FrenchTyposSettingTab };', {
+runInNewContext(transformSync(source + '\nexport { FrenchTyposSettingTab, doubleApostropheQuote };', {
 	loader: 'ts', format: 'cjs'
 }).code, {
 	module: moduleForCheck,
@@ -41,6 +41,16 @@ runInNewContext(transformSync(source + '\nexport { FrenchTyposSettingTab };', {
 
 const plugin = new moduleForCheck.exports.default();
 plugin.settings = { highlightEnabled: true };
+
+for (const [beforeCursor, expected] of [
+	["'", '“'], ["Texte ’", '“'],
+	["“Citation'", '”'], ["“Citation\nsuite’", '”'],
+	["“Citation” puis 'autre'", '“'],
+	['', null], ['Texte', null], ["Texte'\n", null]
+]) {
+	assert.equal(moduleForCheck.exports.doubleApostropheQuote(beforeCursor), expected);
+}
+console.log('Double apostrophes: straight and curly apostrophes open or close quotes using preceding text, including across paragraphs.');
 
 function decorations(instance, length) {
 	const result = [];
@@ -101,26 +111,27 @@ const tab = new moduleForCheck.exports.FrenchTyposSettingTab({}, plugin);
 const definitions = tab.getSettingDefinitions();
 const settings = Array.from(definitions).flatMap(definition => Array.from(definition.items || [definition]));
 assert.equal(settings.filter(definition => definition.control).map(definition => definition.control.key).sort().join(','),
-	'apostrophe,desactivatelinks,emdashes,emptytlines,endashes,hyphenate,quotationmarks,twoenters');
+	'apostrophe,desactivatelinks,doubleApostropheQuotes,emdashes,emptytlines,endashes,hyphenate,quotationmarks,twoenters');
 assert.equal(typeof settings.find(definition => definition.name === 'Highlight').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'Highlight status bar button').render, 'function');
+assert.equal(typeof settings.find(definition => definition.name === 'First line indent').render, 'function');
 console.log('Settings search: existing settings are declared and highlight callbacks remain available.');
 
 async function checkLoadedSettings() {
 	const defaults = {
-		apostrophe: true, quotationmarks: true, emdashes: true, endashes: true,
-		twoenters: false, desactivatelinks: true, hyphenate: true, emptytlines: 'small',
+		apostrophe: true, doubleApostropheQuotes: false, quotationmarks: true, emdashes: true, endashes: true,
+		twoenters: false, desactivatelinks: true, hyphenate: true, firstLineIndent: true, emptytlines: 'small',
 		highlightEnabled: true, highlightButton: true
 	};
-	for (const data of [null, undefined, [], 'invalid', 42, { apostrophe: 'false', emptytlines: 'invalid' }]) {
+	for (const data of [null, undefined, [], 'invalid', 42, { apostrophe: 'false', doubleApostropheQuotes: 'true', firstLineIndent: 'false', emptytlines: 'invalid' }]) {
 		plugin.loadData = async () => data;
 		await plugin.loadSettings();
 		assert.deepEqual({ ...plugin.settings }, defaults);
 	}
 	for (const emptytlines of ['normal', 'small', 'invisible']) {
 		const saved = {
-			apostrophe: false, quotationmarks: false, emdashes: false, endashes: false,
-			twoenters: true, desactivatelinks: false, hyphenate: false, emptytlines,
+			apostrophe: false, doubleApostropheQuotes: true, quotationmarks: false, emdashes: false, endashes: false,
+			twoenters: true, desactivatelinks: false, hyphenate: false, firstLineIndent: false, emptytlines,
 			highlightEnabled: false, highlightButton: false
 		};
 		plugin.loadData = async () => saved;

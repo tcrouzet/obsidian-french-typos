@@ -1,14 +1,14 @@
 {
   "apostrophe": true,
+  "doubleApostropheQuotes": true,
   "quotationmarks": true,
   "emdashes": true,
   "endashes": true,
   "twoenters": false,
   "desactivatelinks": true,
   "hyphenate": true,
+  "firstLineIndent": true,
   "emptytlines": "small",
   "highlightEnabled": true,
-  "highlightButton": false,
-  "hardspaces": true,
-  "nobrcss": false
+  "highlightButton": false
 }

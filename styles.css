@@ -1,11 +1,12 @@
 /* styles.css */
 
-/* Styles pour les lignes vides invisibles */
-body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .cm-line:not(.HyperMD-header)::before {
+/* First line indent */
+body.french-typos-indent .markdown-source-view.mod-cm6.is-live-preview .cm-line:not(.HyperMD-header)::before {
     content: '';
     padding-left: 2rem;
 }
 
+/* Styles pour les lignes vides invisibles */
 body.french-typos-nobr .markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-1{
     margin-bottom: 2rem;
 }
@@ -49,10 +50,6 @@ body.french-typos-highlight .cm-line .em-dash-char {
 
 
 /* small_interline */
-body.french-typos-small_interline .markdown-source-view.mod-cm6.is-live-preview .cm-line:not(.HyperMD-header)::before {
-    content: '';
-    padding-left: 2rem;
-}
 body.french-typos-small_interline .markdown-source-view.mod-cm6.is-live-preview .cm-line.french-typos-empty-line {
     height: 0.7rem;
 }
@@ -68,7 +65,7 @@ body.french-typos-hyphens .markdown-preview-view p {
     hyphenate-limit-chars: 6 3 3;
 }
 
-body.french-typos-hyphens .markdown-preview-view p::before {
+body.french-typos-indent .markdown-preview-view p::before {
     content: '';
     padding-left: 3rem;
 }
