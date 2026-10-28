@@ -14,7 +14,7 @@ Vous écrivez, les apostrophes se courbent, les guillemets s’ouvrent et les di
 2. Chercher **French Typos**, puis choisir **Installer** et **Activer**.
 3. Ouvrir une note en **Aperçu en direct** et commencer à écrire.
 
-Obsidian **1.14 ou ultérieur** est requis. Les transformations pendant la saisie fonctionnent en Aperçu en direct ; les réglages de lecture sont décrits ci-dessous.
+Obsidian **1.14 ou ultérieur** est requis. Les transformations pendant la saisie fonctionnent dans l’éditeur de la note en Aperçu en direct. Le frontmatter YAML et les champs de réglages sont exclus ; les réglages de lecture sont décrits ci-dessous.
 
 ## Écrire avec les bons signes
 
@@ -30,7 +30,7 @@ Les espaces insécables gardent le guillemet avec le texte et le tiret avec le d
 
 Pour les guillemets anglais, activer **Double apostrophes to curly quotes** dans **Réglages → French Typos**. Saisir `''bonjour''` donne `“bonjour”`. L’option est désactivée par défaut ; elle fonctionne aussi avec la conversion en apostrophes courbes active.
 
-Une note contient déjà des apostrophes droites ? Ouvrir la palette de commandes (`Cmd+P` sur Mac, `Ctrl+P` sur Windows/Linux) et lancer **French Typos: Apostrophes**. La commande les remplace dans toute la note.
+Une note contient déjà des apostrophes droites ? Ouvrir la palette de commandes (`Cmd+P` sur Mac, `Ctrl+P` sur Windows/Linux) et lancer **French Typos: Apostrophes**. La commande les remplace dans le corps de la note en conservant le frontmatter YAML.
 
 ## Donner à vos notes une allure de livre
 

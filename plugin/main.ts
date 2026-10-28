@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, PluginSettingTab, Plugin, SettingDefinitionItem } from 'obsidian';
+import { App, Editor, MarkdownView, PluginSettingTab, Plugin, SettingDefinitionItem, editorInfoField } from 'obsidian';
 import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder, StateEffect } from '@codemirror/state';
 
@@ -45,6 +45,14 @@ function doubleApostropheQuote(beforeCursor: string): string | null {
 	return beforeCursor.lastIndexOf('“') > beforeCursor.lastIndexOf('”') ? '”' : '“';
 }
 
+function noteBodyStart(text: string): number {
+	const opening = /^\uFEFF?---[ \t]*(?:\r?\n|$)/.exec(text);
+	if (!opening) return 0;
+	const closing = /^(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/m.exec(text.slice(opening[0].length));
+	if (!closing) return text.length + 1;
+	return opening[0].length + closing.index + closing[0].length + (closing[0].endsWith('\n') ? 0 : 1);
+}
+
 export default class FrenchTypos extends Plugin {
 	settings: FrenchTyposSettings;
 	private openQuote: boolean = true; // Variable pour suivre l'état des guillemets
@@ -67,17 +75,20 @@ export default class FrenchTypos extends Plugin {
 		this.registerDomEvent(document, 'keydown', (event: KeyboardEvent) => {
 			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
-			if (!activeView || activeView.getMode() !== 'source') {
+			if (!activeView || activeView.getMode() !== 'source' || !activeView.editor.hasFocus() || !event.composedPath().includes(activeView.contentEl)) {
 				return;
 			}
 
-			const activeState = this.app.workspace.getLeaf().getViewState().state
+			const activeState = activeView.getState();
 
 			if (activeView && activeView.getMode() === 'source' && activeState?.["source"] === false) {
 				const editor = activeView.editor;
+				const bodyStart = noteBodyStart(editor.getValue());
+				if (editor.listSelections().some(({ anchor, head }) =>
+					editor.posToOffset(anchor) < bodyStart || editor.posToOffset(head) < bodyStart)) return;
 				const cursor = editor.getCursor();
 				const quote = (event.key === "'" || event.key === '’') && this.settings.doubleApostropheQuotes && !editor.getSelection()
-					? doubleApostropheQuote(editor.getRange({ line: 0, ch: 0 }, cursor))
+					? doubleApostropheQuote(editor.getRange(editor.offsetToPos(bodyStart), cursor))
 					: null;
 
 				if (quote) {
@@ -182,7 +193,8 @@ export default class FrenchTypos extends Plugin {
 	updateApostrophes(editor: Editor) {
 		const cursor = editor.getCursor();
 		const text = editor.getValue();
-		const updatedText = text.replace(/'/g, "’");
+		const bodyStart = noteBodyStart(text);
+		const updatedText = text.slice(0, bodyStart) + text.slice(bodyStart).replace(/'/g, "’");
 		editor.setValue(updatedText);
 		editor.setCursor(cursor);
 	}
@@ -254,6 +266,7 @@ export default class FrenchTypos extends Plugin {
 		const emDashDecoration = Decoration.mark({ class: 'em-dash-char' });
 		const enDashDecoration = Decoration.mark({ class: 'en-dash-char' });
 		const emptyLineDecoration = Decoration.line({ class: 'french-typos-empty-line' });
+		const frontmatterDecoration = Decoration.line({ class: 'french-typos-frontmatter' });
 		const highlightEnabled = () => this.settings.highlightEnabled;
 
 		return ViewPlugin.fromClass(class {
@@ -271,11 +284,19 @@ export default class FrenchTypos extends Plugin {
 			}
 
 			buildDecorations(view: EditorView) {
+				if (!(view.state.field(editorInfoField, false) instanceof MarkdownView)) return Decoration.none;
 				const builder = new RangeSetBuilder<Decoration>();
 				const enabled = highlightEnabled();
+				const bodyStart = noteBodyStart(view.state.doc.toString());
 				for (const { from, to } of view.visibleRanges) {
 					const text = view.state.doc.sliceString(from, to);
 					for (let i = 0; i <= text.length; i++) {
+						if (from + i < bodyStart) {
+							if (view.state.doc.lineAt(from + i).from === from + i) {
+								builder.add(from + i, from + i, frontmatterDecoration);
+							}
+							continue;
+						}
 						if ((i === 0 || text[i - 1] === '\n') && view.state.doc.lineAt(from + i).length === 0) {
 							builder.add(from + i, from + i, emptyLineDecoration);
 						}

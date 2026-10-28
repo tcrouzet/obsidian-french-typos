@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { runInNewContext } = require('node:vm');
 const { transformSync } = require('esbuild');
-const { EditorState } = require('@codemirror/state');
+const { EditorState, StateField } = require('@codemirror/state');
 const { Linter } = require('eslint');
 
 const source = readFileSync('plugin/main.ts', 'utf8');
@@ -26,8 +26,12 @@ assert.deepEqual(linter.verify(source, {
 console.log('Source lint: no this alias, explicit any, unused variables, unsafe assignments or floating promises.');
 
 class MarkdownView {}
+const editorInfoField = StateField.define({ create: () => new MarkdownView(), update: value => value });
+function noteState(config) {
+	return EditorState.create({ ...config, extensions: [editorInfoField] });
+}
 const moduleForCheck = { exports: {} };
-runInNewContext(transformSync(source + '\nexport { FrenchTyposSettingTab, doubleApostropheQuote };', {
+runInNewContext(transformSync(source + '\nexport { FrenchTyposSettingTab, doubleApostropheQuote, noteBodyStart };', {
 	loader: 'ts', format: 'cjs'
 }).code, {
 	module: moduleForCheck,
@@ -35,7 +39,8 @@ runInNewContext(transformSync(source + '\nexport { FrenchTyposSettingTab, double
 	require: name => name === 'obsidian' ? {
 		Plugin: class {},
 		PluginSettingTab: class { constructor(app, plugin) { this.plugin = plugin; } },
-		MarkdownView
+		MarkdownView,
+		editorInfoField
 	} : require(name)
 });
 
@@ -67,13 +72,13 @@ for (const [doc, expected] of [
 	['a\n\nb', [2]],
 	['a\n \nb', []]
 ]) {
-	const state = EditorState.create({ doc });
+	const state = noteState({ doc });
 	const instance = plugin.createDecorations().create({ state, visibleRanges: [{ from: 0, to: doc.length }] });
 	assert.deepEqual(decorations(instance, doc.length).map(([from]) => from), expected);
 }
 console.log('Empty lines: empty document, consecutive, trailing and whitespace-only lines pass.');
 
-let state = EditorState.create({ doc: 'a\u00a0—–\n\nb\n', selection: { anchor: 2 } });
+let state = noteState({ doc: 'a\u00a0—–\n\nb\n', selection: { anchor: 2 } });
 const view = { state, visibleRanges: [{ from: 0, to: state.doc.length }] };
 const instance = plugin.createDecorations().create(view);
 assert.deepEqual(decorations(instance, state.doc.length), [
@@ -102,10 +107,36 @@ plugin.refreshDecorations();
 assert.equal(decorations(instance, state.doc.length).length, 5);
 console.log('Highlight refresh: marks toggle, empty lines remain, text and cursor stay unchanged.');
 
-const partialState = EditorState.create({ doc: 'ab\n\ncd' });
+const partialState = noteState({ doc: 'ab\n\ncd' });
 const partial = plugin.createDecorations().create({ state: partialState, visibleRanges: [{ from: 1, to: 4 }] });
 assert.deepEqual(decorations(partial, partialState.doc.length), [[3, 3, 'french-typos-empty-line']]);
 console.log('Partial viewport: only genuinely empty lines are marked.');
+
+const yamlDoc = "---\ntitle: 'a\u00a0—'\n\n---\n\nTexte\u00a0—";
+const yamlState = noteState({ doc: yamlDoc });
+const yamlDecorations = plugin.createDecorations().create({ state: yamlState, visibleRanges: [{ from: 0, to: yamlDoc.length }] });
+assert.ok(decorations(yamlDecorations, yamlDoc.length)
+	.filter(([, , name]) => ['invisible-char', 'em-dash-char', 'en-dash-char'].includes(name))
+	.every(([from]) => from >= yamlDoc.indexOf('Texte')), 'YAML must have no typographic highlighting');
+assert.equal(decorations(yamlDecorations, yamlDoc.length).filter(([, , name]) => name === 'french-typos-frontmatter').length, 4);
+for (const doc of [yamlDoc, "Texte\u00a0—\n\n"]) {
+	for (const extensions of [[], [editorInfoField.init(() => ({}))]]) {
+		const state = EditorState.create({ doc, extensions });
+		const foreign = plugin.createDecorations().create({ state, visibleRanges: [{ from: 0, to: doc.length }] });
+		assert.deepEqual(decorations(foreign, doc.length), [], 'Editors outside Markdown notes must have no plugin decorations');
+	}
+}
+for (const [text, expected] of [
+	["Texte 'normal'", 0], ["Texte\n---\n'a'", 0],
+	["---\ntitle: 'a'\n---\nTexte", "---\ntitle: 'a'\n---\n".length],
+	['---\n---\n', '---\n---\n'.length],
+	["\uFEFF--- \r\ntitle: 'a'\r\n... \r\nTexte", "\uFEFF--- \r\ntitle: 'a'\r\n... \r\n".length],
+	['---\ntitle: a', '---\ntitle: a'.length + 1],
+	['---\n---', '---\n---'.length + 1]
+]) {
+	assert.equal(moduleForCheck.exports.noteBodyStart(text), expected);
+}
+console.log('Note scope: frontmatter is protected, including unfinished YAML; foreign editors have no decorations.');
 
 const tab = new moduleForCheck.exports.FrenchTyposSettingTab({}, plugin);
 const definitions = tab.getSettingDefinitions();
