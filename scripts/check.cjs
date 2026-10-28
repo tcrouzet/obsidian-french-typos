@@ -78,12 +78,13 @@ for (const [doc, expected] of [
 }
 console.log('Empty lines: empty document, consecutive, trailing and whitespace-only lines pass.');
 
-let state = noteState({ doc: 'a\u00a0—–\n\nb\n', selection: { anchor: 2 } });
+let state = noteState({ doc: 'a\u00a0—–\t\n\nb\n', selection: { anchor: 2 } });
 const view = { state, visibleRanges: [{ from: 0, to: state.doc.length }] };
 const instance = plugin.createDecorations().create(view);
 assert.deepEqual(decorations(instance, state.doc.length), [
 	[1, 2, 'invisible-char'], [2, 3, 'em-dash-char'], [3, 4, 'en-dash-char'],
-	[5, 5, 'french-typos-empty-line'], [8, 8, 'french-typos-empty-line']
+	[4, 5, 'french-typos-tab-char'],
+	[6, 6, 'french-typos-empty-line'], [9, 9, 'french-typos-empty-line']
 ]);
 
 const markdownView = new MarkdownView();
@@ -100,11 +101,11 @@ plugin.app = { workspace: { iterateAllLeaves(callback) { callback({ view: markdo
 plugin.settings.highlightEnabled = false;
 plugin.refreshDecorations();
 assert.deepEqual(decorations(instance, state.doc.length), [
-	[5, 5, 'french-typos-empty-line'], [8, 8, 'french-typos-empty-line']
+	[6, 6, 'french-typos-empty-line'], [9, 9, 'french-typos-empty-line']
 ]);
 plugin.settings.highlightEnabled = true;
 plugin.refreshDecorations();
-assert.equal(decorations(instance, state.doc.length).length, 5);
+assert.equal(decorations(instance, state.doc.length).length, 6);
 console.log('Highlight refresh: marks toggle, empty lines remain, text and cursor stay unchanged.');
 
 const partialState = noteState({ doc: 'ab\n\ncd' });
@@ -112,14 +113,14 @@ const partial = plugin.createDecorations().create({ state: partialState, visible
 assert.deepEqual(decorations(partial, partialState.doc.length), [[3, 3, 'french-typos-empty-line']]);
 console.log('Partial viewport: only genuinely empty lines are marked.');
 
-const yamlDoc = "---\ntitle: 'a\u00a0—'\n\n---\n\nTexte\u00a0—";
+const yamlDoc = "---\ntitle: 'a\u00a0—\t'\n\n---\n\nTexte\u00a0—\t";
 const yamlState = noteState({ doc: yamlDoc });
 const yamlDecorations = plugin.createDecorations().create({ state: yamlState, visibleRanges: [{ from: 0, to: yamlDoc.length }] });
 assert.ok(decorations(yamlDecorations, yamlDoc.length)
-	.filter(([, , name]) => ['invisible-char', 'em-dash-char', 'en-dash-char'].includes(name))
+	.filter(([, , name]) => ['invisible-char', 'em-dash-char', 'en-dash-char', 'french-typos-tab-char'].includes(name))
 	.every(([from]) => from >= yamlDoc.indexOf('Texte')), 'YAML must have no typographic highlighting');
 assert.equal(decorations(yamlDecorations, yamlDoc.length).filter(([, , name]) => name === 'french-typos-frontmatter').length, 4);
-for (const doc of [yamlDoc, "Texte\u00a0—\n\n"]) {
+for (const doc of [yamlDoc, "Texte\u00a0—\t\n\n"]) {
 	for (const extensions of [[], [editorInfoField.init(() => ({}))]]) {
 		const state = EditorState.create({ doc, extensions });
 		const foreign = plugin.createDecorations().create({ state, visibleRanges: [{ from: 0, to: doc.length }] });

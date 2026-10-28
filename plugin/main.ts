@@ -263,6 +263,7 @@ export default class FrenchTypos extends Plugin {
 
 	createDecorations() {
 		const invisibleCharDecoration = Decoration.mark({ class: 'invisible-char' });
+		const tabDecoration = Decoration.mark({ class: 'french-typos-tab-char' });
 		const emDashDecoration = Decoration.mark({ class: 'em-dash-char' });
 		const enDashDecoration = Decoration.mark({ class: 'en-dash-char' });
 		const emptyLineDecoration = Decoration.line({ class: 'french-typos-empty-line' });
@@ -303,6 +304,9 @@ export default class FrenchTypos extends Plugin {
 						if (!enabled) continue;
 						if (text[i] === '\u00A0') {
 							builder.add(from + i, from + i + 1, invisibleCharDecoration);
+						}
+						if (text[i] === '\t') {
+							builder.add(from + i, from + i + 1, tabDecoration);
 						}
 						if (text[i] === '—') {
 							builder.add(from + i, from + i + 1, emDashDecoration);
@@ -504,7 +508,7 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 			},
 			{
 				type: 'group',
-				heading: 'Highlight hidden hardspaces and em dashes',
+				heading: 'Highlight hidden hardspaces, tabs and dashes',
 				items: [
 					{
 						name: 'Highlight',

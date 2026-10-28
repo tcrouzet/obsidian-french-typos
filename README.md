@@ -45,7 +45,7 @@ Recharger le coffre après avoir modifié **Empty lines** ou **Hyphenate French 
 
 ## Voir les espaces invisibles
 
-Une espace insécable ressemble à une espace ordinaire. French Typos la met en évidence, ainsi que les tirets cadratins et demi-cadratins, pour faciliter la relecture.
+Une espace insécable ressemble à une espace ordinaire. French Typos la met en évidence, ainsi que les tirets cadratins et demi-cadratins, pour faciliter la relecture. Les tabulations apparaissent avec une flèche bleue `→` dans l’éditeur, sans modifier le texte ni leur largeur.
 
 Cliquer sur **¶**, dans la barre d’état, pour activer ou désactiver cette mise en évidence. Les options **Highlight** et **Highlight status bar button**, dans les réglages, permettent de choisir le surlignage et l’affichage du bouton.
 
