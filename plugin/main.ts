@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, PluginSettingTab, Plugin, SettingDefinitionItem, editorInfoField } from 'obsidian';
+import { App, Editor, MarkdownView, MarkdownRenderChild, PluginSettingTab, Plugin, SettingDefinitionItem, editorInfoField } from 'obsidian';
 import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder, StateEffect } from '@codemirror/state';
 
@@ -51,6 +51,20 @@ function noteBodyStart(text: string): number {
 	const closing = /^(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/m.exec(text.slice(opening[0].length));
 	if (!closing) return text.length + 1;
 	return opening[0].length + closing.index + closing[0].length + (closing[0].endsWith('\n') ? 0 : 1);
+}
+
+function markIndentExclusions(element: HTMLElement) {
+	const paragraphs = element.matches('.cm-line, p') ? [element] : Array.from(element.querySelectorAll<HTMLElement>('.cm-line, p'));
+	for (const paragraph of paragraphs) {
+		paragraph.classList.toggle('french-typos-no-indent', !!paragraph.querySelector('hr, img:not(.cm-widgetBuffer), .image-embed, .cm-image'));
+	}
+}
+
+function observeIndentExclusions(element: HTMLElement): MutationObserver {
+	const observer = new MutationObserver(() => markIndentExclusions(element));
+	observer.observe(element, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+	markIndentExclusions(element);
+	return observer;
 }
 
 export default class FrenchTypos extends Plugin {
@@ -184,6 +198,13 @@ export default class FrenchTypos extends Plugin {
 
 
 		this.registerEditorExtension(this.createDecorations());
+		this.registerEditorExtension(this.createIndentExclusions());
+		this.registerMarkdownPostProcessor((element, context) => {
+			const observer = observeIndentExclusions(element);
+			const child = new MarkdownRenderChild(element);
+			child.register(() => observer.disconnect());
+			context.addChild(child);
+		});
 
         // Add a status bar item
 		this.updateStatusBarButton();
@@ -257,6 +278,22 @@ export default class FrenchTypos extends Plugin {
 
 	updateFirstLineIndent() {
 		document.body.classList.toggle('french-typos-indent', this.settings.firstLineIndent);
+	}
+
+	createIndentExclusions() {
+		return ViewPlugin.fromClass(class {
+			observer: MutationObserver | undefined;
+
+			constructor(view: EditorView) {
+				if (view.state.field(editorInfoField, false) instanceof MarkdownView) {
+					this.observer = observeIndentExclusions(view.contentDOM);
+				}
+			}
+
+			destroy() {
+				this.observer?.disconnect();
+			}
+		});
 	}
 
 	// Highlighting zone

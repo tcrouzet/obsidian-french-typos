@@ -6,6 +6,7 @@ const { EditorState, StateField } = require('@codemirror/state');
 const { Linter } = require('eslint');
 
 const source = readFileSync('plugin/main.ts', 'utf8');
+assert.doesNotMatch(readFileSync('styles.css', 'utf8'), /:has\s*\(/, 'Indentation must not use :has selectors');
 const linter = new Linter();
 linter.defineParser('@typescript-eslint/parser', require('@typescript-eslint/parser'));
 const rules = require('@typescript-eslint/eslint-plugin').rules;
@@ -125,6 +126,9 @@ for (const doc of [yamlDoc, "Texte\u00a0—\t\n\n"]) {
 		const state = EditorState.create({ doc, extensions });
 		const foreign = plugin.createDecorations().create({ state, visibleRanges: [{ from: 0, to: doc.length }] });
 		assert.deepEqual(decorations(foreign, doc.length), [], 'Editors outside Markdown notes must have no plugin decorations');
+		const foreignIndent = plugin.createIndentExclusions().create({ state });
+		assert.equal(foreignIndent.observer, undefined, 'Editors outside Markdown notes must not be observed');
+		foreignIndent.destroy();
 	}
 }
 for (const [text, expected] of [
