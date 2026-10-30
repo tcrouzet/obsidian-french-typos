@@ -144,6 +144,7 @@ for (const [text, expected] of [
 console.log('Note scope: frontmatter is protected, including unfinished YAML; foreign editors have no decorations.');
 
 const tab = new moduleForCheck.exports.FrenchTyposSettingTab({}, plugin);
+assert.equal(tab.icon, 'french-typos');
 const definitions = tab.getSettingDefinitions();
 const settings = Array.from(definitions).flatMap(definition => Array.from(definition.items || [definition]));
 assert.equal(settings.filter(definition => definition.control).map(definition => definition.control.key).sort().join(','),

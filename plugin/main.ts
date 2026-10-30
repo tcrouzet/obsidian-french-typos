@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, MarkdownRenderChild, PluginSettingTab, Plugin, SettingDefinitionItem, editorInfoField } from 'obsidian';
+import { App, Editor, MarkdownView, MarkdownRenderChild, PluginSettingTab, Plugin, SettingDefinitionItem, addIcon, editorInfoField } from 'obsidian';
 import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder, StateEffect } from '@codemirror/state';
 
@@ -76,6 +76,7 @@ export default class FrenchTypos extends Plugin {
 		this.updateFirstLineIndent();
 		this.register(() => document.body.classList.remove('french-typos-indent'));
 
+		addIcon('french-typos', '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 6-6 6 6 6m8-12-6 6 6 6"/></svg>');
 		this.addSettingTab(new FrenchTyposSettingTab(this.app, this));
 
 		this.addCommand({
@@ -470,6 +471,7 @@ export default class FrenchTypos extends Plugin {
 }
 
 class FrenchTyposSettingTab extends PluginSettingTab {
+	override icon = 'french-typos';
 	plugin: FrenchTypos;
 
 	constructor(app: App, plugin: FrenchTypos) {
