@@ -2,6 +2,7 @@
   "sourceMode": "Mode source",
   "livePreview": "Aperçu en direct",
   "bookPreview": "Aperçu livre",
+  "bookPreviewDescription": "Activer l’aperçu livre pour la note courante. Désactiver pour revenir à l’aperçu en direct.",
   "apostrophes": "Apostrophes",
   "apostrophe": "Apostrophe",
   "apostropheDescription": "Activer l’apostrophe typographique.",

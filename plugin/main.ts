@@ -386,8 +386,8 @@ export default class FrenchTypos extends Plugin {
 			const wasActive = root.classList.contains('french-typos-book-preview');
 			if (active && !wasActive) {
 				const scroller = root.querySelector<HTMLElement>('.cm-scroller');
-				if (scroller) {
-					const style = scroller.win.getComputedStyle(scroller);
+				const style = scroller?.ownerDocument.defaultView?.getComputedStyle(scroller);
+				if (style) {
 					root.style.setProperty('--french-typos-book-original-font', style.fontFamily);
 					root.style.setProperty('--french-typos-book-original-size', style.fontSize);
 					root.style.setProperty('--french-typos-book-original-height', style.lineHeight);
@@ -660,7 +660,7 @@ class BookFontModal extends FuzzySuggestModal<string> {
 	}
 	getItems() { return this.fonts; }
 	getItemText(font: string) { return font === 'serif' ? t('systemSerif') : font; }
-	onChooseItem(font: string) { return this.choose(font); }
+	onChooseItem(font: string): void { void this.choose(font); }
 }
 
 class FrenchTyposSettingTab extends PluginSettingTab {
@@ -748,6 +748,19 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 				heading: t('bookPreview'),
 				items: [
 					{
+						name: t('bookPreview'),
+						desc: t('bookPreviewDescription'),
+						render: setting => {
+							const view = this.app.workspace.getMostRecentLeaf()?.view;
+							setting.addToggle(toggle => toggle
+								.setValue(view instanceof MarkdownView && view.containerEl.classList.contains('french-typos-book-preview'))
+								.setDisabled(!(view instanceof MarkdownView))
+								.onChange(async value => {
+									if (view instanceof MarkdownView) await this.plugin.setBookMode(view, value ? 'book' : 'live');
+								}));
+						}
+					},
+					{
 						name: t('font'),
 						desc: t('fontDescription'),
 						render: setting => {
@@ -799,12 +812,11 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 						name: t('color'),
 						desc: t('colorDescription'),
 						render: setting => {
-							const sample = setting.settingEl.createEl('canvas', { attr: { width: '1', height: '1' } });
-							sample.style.color = 'var(--h1-color, var(--text-normal))';
+							const sample = setting.settingEl.createEl('canvas', { cls: 'french-typos-theme-color', attr: { width: '1', height: '1' } });
 							const context = sample.getContext('2d');
 							let themeColor = '#000000';
 							if (context) {
-								context.fillStyle = sample.win.getComputedStyle(sample).color;
+								context.fillStyle = sample.ownerDocument.defaultView?.getComputedStyle(sample).color ?? themeColor;
 								context.fillRect(0, 0, 1, 1);
 								themeColor = '#' + Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3)
 									.map(channel => channel.toString(16).padStart(2, '0')).join('');

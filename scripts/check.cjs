@@ -10,7 +10,7 @@ assert.doesNotMatch(readFileSync('styles.css', 'utf8'), /:has\s*\(/, 'Indentatio
 const linter = new Linter();
 linter.defineParser('@typescript-eslint/parser', require('@typescript-eslint/parser'));
 const rules = require('@typescript-eslint/eslint-plugin').rules;
-for (const name of ['no-this-alias', 'no-explicit-any', 'no-unused-vars', 'no-unsafe-assignment', 'no-floating-promises']) {
+for (const name of ['no-this-alias', 'no-explicit-any', 'no-unused-vars', 'no-unsafe-assignment', 'no-floating-promises', 'no-unsafe-call', 'no-unsafe-argument', 'no-unsafe-return', 'no-misused-promises']) {
 	linter.defineRule('@typescript-eslint/' + name, rules[name]);
 }
 for (const file of ['plugin/main.ts', 'plugin/i18n.ts']) assert.deepEqual(linter.verify(readFileSync(file, 'utf8'), {
@@ -21,7 +21,11 @@ for (const file of ['plugin/main.ts', 'plugin/i18n.ts']) assert.deepEqual(linter
 		'@typescript-eslint/no-explicit-any': 'error',
 		'@typescript-eslint/no-unused-vars': 'error',
 		'@typescript-eslint/no-unsafe-assignment': 'error',
-		'@typescript-eslint/no-floating-promises': 'error'
+		'@typescript-eslint/no-floating-promises': 'error',
+		'@typescript-eslint/no-unsafe-call': 'error',
+		'@typescript-eslint/no-unsafe-argument': 'error',
+		'@typescript-eslint/no-unsafe-return': 'error',
+		'@typescript-eslint/no-misused-promises': 'error'
 	}
 }, file), []);
 console.log('Source lint: no this alias, explicit any, unused variables, unsafe assignments or floating promises.');
@@ -41,7 +45,7 @@ runInNewContext(buildSync({
 	require: name => name === 'obsidian' ? {
 		Plugin: class {},
 		FuzzySuggestModal: class { setPlaceholder(value) { this.placeholder = value; } },
-		PluginSettingTab: class { constructor(app, plugin) { this.plugin = plugin; } },
+		PluginSettingTab: class { constructor(app, plugin) { this.app = app; this.plugin = plugin; } },
 		MarkdownView,
 		editorInfoField
 	} : require(name)
@@ -161,6 +165,8 @@ assert.deepEqual(Array.from(Array.from(definitions).find(definition => definitio
 	['Highlight', 'Color', 'Cursor size', 'Button']);
 const bookSettings = Array.from(Array.from(definitions).find(definition => definition.heading === 'Book preview').items);
 assert.equal(typeof bookSettings.find(definition => definition.name === 'Font').render, 'function');
+assert.equal(bookSettings[0].name, 'Book preview');
+assert.equal(typeof bookSettings[0].render, 'function');
 assert.equal(bookSettings.find(definition => definition.name === 'Text size').control.min, 12);
 assert.equal(bookSettings.find(definition => definition.name === 'Text size').control.max, 40);
 assert.equal(definitions[0].heading, 'Live preview');
@@ -181,10 +187,13 @@ for (const language of ['fr', 'fr-CA', 'FR_fr']) {
 	assert.deepEqual({ ...translated[0].items.find(item => item.control?.key === 'emptytlines').control.options },
 		{ normal: 'Normales', small: 'Réduites', invisible: 'Invisibles' });
 	assert.equal(t('pixels', { value: 24 }), '24 px');
-	const modal = new moduleForCheck.exports.BookFontModal({}, ['serif'], async () => {});
+	let chosen;
+	const modal = new moduleForCheck.exports.BookFontModal({}, ['serif'], async font => { chosen = font; });
 	assert.equal(modal.placeholder, 'Choisir une police');
 	assert.equal(modal.getItemText('serif'), 'Serif du système');
 	assert.equal(modal.getItemText('Palatino'), 'Palatino');
+	assert.equal(modal.onChooseItem('Palatino'), undefined);
+	assert.equal(chosen, 'Palatino');
 }
 for (const language of ['en-US', 'de', '']) {
 	setLocale(language);
@@ -288,7 +297,45 @@ async function checkLoadedSettings() {
 	console.log('Settings loading: saved values preserved; missing or invalid values use defaults; read errors propagate.');
 }
 
-checkLoadedSettings().catch(error => {
+async function checkBookToggle() {
+	const view = new MarkdownView();
+	let active = false;
+	view.containerEl = { classList: { contains: name => active && name === 'french-typos-book-preview' } };
+	let current = view;
+	const calls = [];
+	const testPlugin = { setBookMode: async (target, mode) => { calls.push([target, mode]); } };
+	const app = { workspace: { getMostRecentLeaf: () => current ? { view: current } : null } };
+	const tab = new moduleForCheck.exports.FrenchTyposSettingTab(app, testPlugin);
+	const render = () => {
+		const toggle = {
+			setValue(value) { this.value = value; return this; },
+			setDisabled(disabled) { this.disabled = disabled; return this; },
+			onChange(callback) { this.change = callback; return this; }
+		};
+		tab.getSettingDefinitions()[1].items[0].render({ addToggle: callback => callback(toggle) });
+		return toggle;
+	};
+	let toggle = render();
+	assert.equal(toggle.value, false);
+	assert.equal(toggle.disabled, false);
+	await toggle.change(true);
+	assert.deepEqual(calls.pop(), [view, 'book']);
+	active = true;
+	toggle = render();
+	assert.equal(toggle.value, true);
+	await toggle.change(false);
+	assert.deepEqual(calls.pop(), [view, 'live']);
+	for (current of [null, {}]) {
+		toggle = render();
+		assert.equal(toggle.value, false);
+		assert.equal(toggle.disabled, true);
+		await toggle.change(true);
+		assert.equal(calls.length, 0);
+	}
+	console.log('Book preview switch: reflects note mode, routes On/Off to Book/Live, disabled without a Markdown note.');
+}
+
+Promise.all([checkLoadedSettings(), checkBookToggle()]).catch(error => {
 	console.error(error);
 	process.exitCode = 1;
 });

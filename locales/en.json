@@ -2,6 +2,7 @@
   "sourceMode": "Source mode",
   "livePreview": "Live preview",
   "bookPreview": "Book preview",
+  "bookPreviewDescription": "Enable Book preview for the current note. Turn off to return to Live preview.",
   "apostrophes": "Apostrophes",
   "apostrophe": "Apostrophe",
   "apostropheDescription": "Activate typographic apostrophe",

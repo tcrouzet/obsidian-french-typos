@@ -33,6 +33,10 @@ body.french-typos-nobr .workspace-leaf-content[data-type="markdown"] .markdown-s
 
 
 /* highlight */
+canvas.french-typos-theme-color {
+    color: var(--h1-color, var(--text-normal));
+}
+
 .workspace-leaf-content[data-type="markdown"] .markdown-source-view.mod-cm6 .cm-editor.french-typos-bold-cursor .cm-cursor {
     border-left-width: var(--french-typos-cursor-width);
     border-left-color: var(--french-typos-highlight-color);
