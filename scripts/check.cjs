@@ -4,6 +4,12 @@ const { runInNewContext } = require('node:vm');
 const { buildSync } = require('esbuild');
 const { EditorState, StateField } = require('@codemirror/state');
 const { Linter } = require('eslint');
+const ts = require('typescript');
+
+const config = ts.readConfigFile('tsconfig.json', ts.sys.readFile);
+assert.equal(config.error, undefined);
+const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, process.cwd());
+const browserProgram = ts.createProgram(parsed.fileNames, { ...parsed.options, types: [], skipLibCheck: true, noEmit: true });
 
 const source = readFileSync('plugin/main.ts', 'utf8');
 assert.doesNotMatch(readFileSync('styles.css', 'utf8'), /:has\s*\(/, 'Indentation must not use :has selectors');
@@ -15,7 +21,7 @@ for (const name of ['no-this-alias', 'no-explicit-any', 'no-unused-vars', 'no-un
 }
 for (const file of ['plugin/main.ts', 'plugin/i18n.ts']) assert.deepEqual(linter.verify(readFileSync(file, 'utf8'), {
 	parser: '@typescript-eslint/parser',
-	parserOptions: { ecmaVersion: 2020, sourceType: 'module', project: './tsconfig.json', tsconfigRootDir: process.cwd() },
+	parserOptions: { ecmaVersion: 2020, sourceType: 'module', programs: [browserProgram], tsconfigRootDir: process.cwd() },
 	rules: {
 		'@typescript-eslint/no-this-alias': 'error',
 		'@typescript-eslint/no-explicit-any': 'error',
