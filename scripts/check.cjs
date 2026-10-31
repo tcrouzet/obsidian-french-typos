@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { runInNewContext } = require('node:vm');
-const { transformSync } = require('esbuild');
+const { buildSync } = require('esbuild');
 const { EditorState, StateField } = require('@codemirror/state');
 const { Linter } = require('eslint');
 
@@ -13,7 +13,7 @@ const rules = require('@typescript-eslint/eslint-plugin').rules;
 for (const name of ['no-this-alias', 'no-explicit-any', 'no-unused-vars', 'no-unsafe-assignment', 'no-floating-promises']) {
 	linter.defineRule('@typescript-eslint/' + name, rules[name]);
 }
-assert.deepEqual(linter.verify(source, {
+for (const file of ['plugin/main.ts', 'plugin/i18n.ts']) assert.deepEqual(linter.verify(readFileSync(file, 'utf8'), {
 	parser: '@typescript-eslint/parser',
 	parserOptions: { ecmaVersion: 2020, sourceType: 'module', project: './tsconfig.json', tsconfigRootDir: process.cwd() },
 	rules: {
@@ -23,7 +23,7 @@ assert.deepEqual(linter.verify(source, {
 		'@typescript-eslint/no-unsafe-assignment': 'error',
 		'@typescript-eslint/no-floating-promises': 'error'
 	}
-}, 'plugin/main.ts'), []);
+}, file), []);
 console.log('Source lint: no this alias, explicit any, unused variables, unsafe assignments or floating promises.');
 
 class MarkdownView {}
@@ -32,13 +32,15 @@ function noteState(config) {
 	return EditorState.create({ ...config, extensions: [editorInfoField] });
 }
 const moduleForCheck = { exports: {} };
-runInNewContext(transformSync(source + '\nexport { FrenchTyposSettingTab, doubleApostropheQuote, noteBodyStart };', {
-	loader: 'ts', format: 'cjs'
-}).code, {
+runInNewContext(buildSync({
+	stdin: { contents: source + "\nexport { FrenchTyposSettingTab, BookFontModal, doubleApostropheQuote, noteBodyStart }; export { setLocale, t } from './i18n';", loader: 'ts', resolveDir: process.cwd() + '/plugin' },
+	bundle: true, write: false, format: 'cjs', external: ['obsidian', '@codemirror/state', '@codemirror/view']
+}).outputFiles[0].text, {
 	module: moduleForCheck,
 	exports: moduleForCheck.exports,
 	require: name => name === 'obsidian' ? {
 		Plugin: class {},
+		FuzzySuggestModal: class { setPlaceholder(value) { this.placeholder = value; } },
 		PluginSettingTab: class { constructor(app, plugin) { this.plugin = plugin; } },
 		MarkdownView,
 		editorInfoField
@@ -148,18 +150,66 @@ assert.equal(tab.icon, 'french-typos');
 const definitions = tab.getSettingDefinitions();
 const settings = Array.from(definitions).flatMap(definition => Array.from(definition.items || [definition]));
 assert.equal(settings.filter(definition => definition.control).map(definition => definition.control.key).sort().join(','),
-	'apostrophe,desactivatelinks,doubleApostropheQuotes,emdashes,emptytlines,endashes,hyphenate,quotationmarks,twoenters');
+	'apostrophe,bookHyphenate,bookIndent,bookJustify,bookNoParagraphSpacing,bookTextSize,desactivatelinks,doubleApostropheQuotes,emdashes,emptytlines,endashes,quotationmarks,twoenters');
 assert.equal(typeof settings.find(definition => definition.name === 'Highlight').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'Button').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'First line indent').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'Cursor size').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'Color').render, 'function');
-for (const name of ['Empty lines', 'Hyphenate French rules']) {
-	assert.doesNotMatch(settings.find(definition => definition.name === name).desc, /reload/i);
-}
+assert.doesNotMatch(settings.find(definition => definition.name === 'Empty lines').desc, /reload/i);
 assert.deepEqual(Array.from(Array.from(definitions).find(definition => definition.heading === 'Highlight').items, item => item.name),
 	['Highlight', 'Color', 'Cursor size', 'Button']);
-console.log('Settings search: existing settings are declared and highlight callbacks remain available.');
+const bookSettings = Array.from(Array.from(definitions).find(definition => definition.heading === 'Book preview').items);
+assert.equal(typeof bookSettings.find(definition => definition.name === 'Font').render, 'function');
+assert.equal(bookSettings.find(definition => definition.name === 'Text size').control.min, 12);
+assert.equal(bookSettings.find(definition => definition.name === 'Text size').control.max, 40);
+assert.equal(definitions[0].heading, 'Live preview');
+assert.ok(!settings.some(item => item.control?.key === 'hyphenate'));
+assert.doesNotMatch(readFileSync('styles.css', 'utf8'), /french-typos-hyphens/);
+const catalogs = Object.fromEntries(['en', 'fr'].map(language => [language, JSON.parse(readFileSync(`locales/${language}.json`, 'utf8'))]));
+assert.deepEqual(Object.keys(catalogs.fr).sort(), Object.keys(catalogs.en).sort());
+for (const [key, english] of Object.entries(catalogs.en)) {
+	assert.ok(catalogs.fr[key].trim(), `Missing French translation: ${key}`);
+	assert.deepEqual(catalogs.fr[key].match(/\{\w+\}/g), english.match(/\{\w+\}/g), `Mismatched placeholders: ${key}`);
+}
+const { setLocale, t } = moduleForCheck.exports;
+for (const language of ['fr', 'fr-CA', 'FR_fr']) {
+	setLocale(language);
+	const translated = tab.getSettingDefinitions();
+	assert.deepEqual(Array.from(translated, group => group.heading), ['Aperçu en direct', 'Aperçu livre', 'Mise en évidence']);
+	assert.deepEqual(Array.from(translated[2].items, item => item.name), ['Mise en évidence', 'Couleur', 'Épaisseur du curseur', 'Bouton']);
+	assert.deepEqual({ ...translated[0].items.find(item => item.control?.key === 'emptytlines').control.options },
+		{ normal: 'Normales', small: 'Réduites', invisible: 'Invisibles' });
+	assert.equal(t('pixels', { value: 24 }), '24 px');
+	const modal = new moduleForCheck.exports.BookFontModal({}, ['serif'], async () => {});
+	assert.equal(modal.placeholder, 'Choisir une police');
+	assert.equal(modal.getItemText('serif'), 'Serif du système');
+	assert.equal(modal.getItemText('Palatino'), 'Palatino');
+}
+for (const language of ['en-US', 'de', '']) {
+	setLocale(language);
+	assert.equal(tab.getSettingDefinitions()[0].heading, 'Live preview');
+}
+for (const file of ['plugin/main.ts', 'plugin/i18n.ts']) {
+	for (const [, key] of readFileSync(file, 'utf8').matchAll(/\bt\('([^']+)'/g)) assert.ok(key in catalogs.en, `Unknown translation key: ${key}`);
+}
+assert.doesNotMatch(source, /(?:name|desc|heading):\s*['"]/);
+console.log('Localized settings: French variants, English fallback, translated font chooser, complete catalogs; Reading hyphenation removed.');
+
+const bookDefaults = {
+	bookFont: 'serif', bookTextSize: 20, bookJustify: true, bookNoParagraphSpacing: true, bookIndent: true, bookHyphenate: true
+};
+plugin.settings = { ...bookDefaults };
+assert.equal(plugin.bookStyleProperties()['--french-typos-book-font'], 'serif');
+assert.equal(plugin.bookStyleProperties()['--french-typos-book-size'], '20px');
+assert.equal(plugin.bookStyleProperties()['--french-typos-book-gap'], 'none');
+plugin.settings = { ...bookDefaults, bookFont: 'iA Writer Duo V', bookJustify: false, bookNoParagraphSpacing: false, bookIndent: false, bookHyphenate: false };
+assert.equal(plugin.bookStyleProperties()['--french-typos-book-font'], '"iA Writer Duo V"');
+assert.equal(plugin.bookStyleProperties()['--french-typos-book-align'], 'start');
+assert.equal(plugin.bookStyleProperties()['--french-typos-book-gap'], 'block');
+assert.equal(plugin.bookStyleProperties()['--french-typos-book-indent'], '0px');
+assert.equal(plugin.bookStyleProperties()['--french-typos-book-hyphens'], 'manual');
+console.log('Book preview: system serif default, quoted custom families and independent paragraph controls.');
 
 plugin.settings = { cursorWidth: 3, highlightColor: '' };
 const cursorState = noteState({ doc: 'Normal paragraph' });
@@ -183,19 +233,21 @@ console.log('Bold cursor: automatic or custom color, YAML and foreign editors ex
 
 async function checkLoadedSettings() {
 	const defaults = {
+		...bookDefaults,
 		apostrophe: true, doubleApostropheQuotes: false, quotationmarks: true, emdashes: true, endashes: true,
-		twoenters: false, desactivatelinks: true, hyphenate: true, firstLineIndent: true, emptytlines: 'small',
+		twoenters: false, desactivatelinks: true, firstLineIndent: true, emptytlines: 'small',
 		highlightEnabled: true, highlightButton: true, cursorWidth: 0, highlightColor: ''
 	};
-	for (const data of [null, undefined, [], 'invalid', 42, { apostrophe: 'false', doubleApostropheQuotes: 'true', firstLineIndent: 'false', emptytlines: 'invalid' }]) {
+	for (const data of [null, undefined, [], 'invalid', 42, { hyphenate: true }, { hyphenate: false }, { apostrophe: 'false', doubleApostropheQuotes: 'true', firstLineIndent: 'false', emptytlines: 'invalid' }]) {
 		plugin.loadData = async () => data;
 		await plugin.loadSettings();
 		assert.deepEqual({ ...plugin.settings }, defaults);
 	}
 	for (const emptytlines of ['normal', 'small', 'invisible']) {
 		const saved = {
+			...bookDefaults, bookFont: 'Palatino', bookTextSize: 24, bookJustify: false, bookNoParagraphSpacing: false, bookIndent: false, bookHyphenate: false,
 			apostrophe: false, doubleApostropheQuotes: true, quotationmarks: false, emdashes: false, endashes: false,
-			twoenters: true, desactivatelinks: false, hyphenate: false, firstLineIndent: false, emptytlines,
+			twoenters: true, desactivatelinks: false, firstLineIndent: false, emptytlines,
 			highlightEnabled: false, highlightButton: false, cursorWidth: 3, highlightColor: '#12abEF'
 		};
 		plugin.loadData = async () => saved;
@@ -205,6 +257,16 @@ async function checkLoadedSettings() {
 	plugin.loadData = async () => ({ apostrophe: false });
 	await plugin.loadSettings();
 	assert.deepEqual({ ...plugin.settings }, { ...defaults, apostrophe: false });
+	for (const bookTextSize of [0, 11, 41, 20.5, NaN, Infinity, '20', true]) {
+		plugin.loadData = async () => ({ bookTextSize });
+		await plugin.loadSettings();
+		assert.equal(plugin.settings.bookTextSize, 20);
+	}
+	for (const bookFont of [null, 42, 'bad\nfont', 'x'.repeat(101)]) {
+		plugin.loadData = async () => ({ bookFont });
+		await plugin.loadSettings();
+		assert.equal(plugin.settings.bookFont, 'serif');
+	}
 	for (const cursorWidth of [-1, 7, 2.5, NaN, Infinity, '3', true]) {
 		plugin.loadData = async () => ({ cursorWidth });
 		await plugin.loadSettings();

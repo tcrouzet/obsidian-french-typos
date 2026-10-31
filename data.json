@@ -12,5 +12,11 @@
   "highlightEnabled": true,
   "highlightButton": false,
   "cursorWidth": 4,
-  "highlightColor": ""
+  "highlightColor": "",
+  "bookFont": "Garamond Premier Pro",
+  "bookTextSize": 29,
+  "bookJustify": true,
+  "bookNoParagraphSpacing": true,
+  "bookIndent": true,
+  "bookHyphenate": true
 }

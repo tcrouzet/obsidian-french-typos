@@ -67,19 +67,51 @@ body.french-typos-small_interline .workspace-leaf-content[data-type="markdown"] 
     height: 0.7rem;
 }
 
-/* french hyphens */
-body.french-typos-hyphens .workspace-leaf-content[data-type="markdown"] .markdown-preview-view p {
-    text-align: justify;
-    margin-top: 0;
-    margin-bottom: 0;
-    hyphens: auto;
-    word-wrap: break-word;
-    hyphenate-character: auto;
-    hyphenate-limit-chars: 6 3 3;
-}
-
 body.french-typos-indent .workspace-leaf-content[data-type="markdown"] .markdown-preview-view .markdown-preview-sizer > .el-p > p:not(.french-typos-no-indent)::before {
     content: '';
-    padding-left: 3rem;
+    padding-left: 2rem;
 }
 
+/* Book preview */
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview {
+    --font-text: var(--french-typos-book-font);
+    --font-editor-theme: var(--french-typos-book-font);
+    --font-text-size: var(--french-typos-book-size);
+}
+
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .markdown-source-view.mod-cm6 .cm-scroller {
+    font-family: var(--french-typos-book-font);
+    font-size: var(--french-typos-book-size);
+}
+
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .markdown-source-view.mod-cm6.is-live-preview .cm-line {
+    margin-block: 0;
+}
+
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .markdown-source-view.mod-cm6.is-live-preview .cm-line.french-typos-frontmatter {
+    font-family: var(--french-typos-book-original-font);
+    font-size: var(--french-typos-book-original-size);
+    line-height: var(--french-typos-book-original-height);
+}
+
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .markdown-source-view.mod-cm6.is-live-preview .cm-line:not([class*="HyperMD-"], .french-typos-frontmatter, .french-typos-empty-line) {
+    text-align: var(--french-typos-book-align);
+    hyphens: var(--french-typos-book-hyphens);
+}
+
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .markdown-source-view.mod-cm6.is-live-preview .cm-line:not([class*="HyperMD-"], .french-typos-frontmatter, .french-typos-empty-line, .french-typos-no-indent)::before {
+    content: '';
+    padding-left: var(--french-typos-book-indent);
+}
+
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .markdown-source-view.mod-cm6.is-live-preview .cm-line.french-typos-empty-line {
+    height: auto;
+}
+
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .markdown-source-view.mod-cm6.is-live-preview .cm-line.french-typos-empty-line:not(.cm-active):not(.cm-activeLine) {
+    display: var(--french-typos-book-gap);
+}
+
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .markdown-source-view.mod-cm6.is-live-preview .cm-line.french-typos-empty-line[class*="HyperMD-"]:not(.cm-active):not(.cm-activeLine) {
+    display: block;
+}

@@ -1,6 +1,8 @@
-import { App, Editor, MarkdownView, MarkdownRenderChild, PluginSettingTab, Plugin, SettingDefinitionItem, addIcon, editorInfoField } from 'obsidian';
+import { App, Editor, FuzzySuggestModal, MarkdownView, MarkdownRenderChild, Menu, Notice, PluginSettingTab, Plugin, SettingDefinitionItem, addIcon, editorInfoField, getLanguage } from 'obsidian';
 import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, drawSelection } from '@codemirror/view';
 import { Compartment, RangeSetBuilder, StateEffect } from '@codemirror/state';
+
+import { setLocale, t } from './i18n';
 
 const refreshHighlight = StateEffect.define<null>();
 
@@ -18,13 +20,18 @@ interface FrenchTyposSettings {
 	endashes: boolean;
 	twoenters: boolean;
 	desactivatelinks: boolean;
-	hyphenate: boolean;
 	firstLineIndent: boolean;
 	emptytlines: string;
 	highlightEnabled: boolean;
 	highlightButton: boolean;
 	cursorWidth: number;
 	highlightColor: string;
+	bookFont: string;
+	bookTextSize: number;
+	bookJustify: boolean;
+	bookNoParagraphSpacing: boolean;
+	bookIndent: boolean;
+	bookHyphenate: boolean;
 }
 
 const DEFAULT_SETTINGS: FrenchTyposSettings = {
@@ -35,13 +42,18 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	endashes: true,
 	twoenters: false,
 	desactivatelinks: true,
-	hyphenate: true,
 	firstLineIndent: true,
 	emptytlines: 'small',
 	highlightEnabled: true,
 	highlightButton: true,
 	cursorWidth: 0,
 	highlightColor: '',
+	bookFont: 'serif',
+	bookTextSize: 20,
+	bookJustify: true,
+	bookNoParagraphSpacing: true,
+	bookIndent: true,
+	bookHyphenate: true,
 }
 
 function doubleApostropheQuote(beforeCursor: string): string | null {
@@ -74,18 +86,47 @@ function observeIndentExclusions(element: HTMLElement): MutationObserver {
 export default class FrenchTypos extends Plugin {
 	settings: FrenchTyposSettings;
 	private openQuote: boolean = true; // Variable pour suivre l'état des guillemets
+	private bookViews = new WeakSet<MarkdownView>();
+	private bookSidebars: { leftCollapsed: boolean; rightCollapsed: boolean } | null = null;
 
 	async onload() {
+		setLocale(getLanguage());
 		await this.loadSettings();
 		this.updateParagraphStyles();
-		this.register(() => document.body.classList.remove('french-typos-indent', 'french-typos-nobr', 'french-typos-small_interline', 'french-typos-hyphens'));
+		this.register(() => document.body.classList.remove('french-typos-indent', 'french-typos-nobr', 'french-typos-small_interline'));
 
 		addIcon('french-typos', '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 6-6 6 6 6m8-12-6 6 6 6"/></svg>');
 		this.addSettingTab(new FrenchTyposSettingTab(this.app, this));
+		this.registerDomEvent(document, 'click', (event: MouseEvent) => {
+			const button = (event.target as Element | null)?.closest?.<HTMLElement>('.status-bar .plugin-editor-status');
+			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+			if (!button || !view || event.button !== 0) return;
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			const menu = new Menu().setUseNativeMenu(false);
+			const current = this.bookViews.has(view) ? 'book' : view.getMode() !== 'source' ? null : view.getState().source === true ? 'source' : 'live';
+			for (const [mode, title, icon] of [
+				['source', t('sourceMode'), 'code-xml'],
+				['live', t('livePreview'), 'edit-3'],
+				['book', t('bookPreview'), 'book-open']
+			] as const) {
+				menu.addItem(item => item.setTitle(title).setIcon(icon).setChecked(current === mode)
+					.onClick(() => this.setBookMode(view, mode)));
+			}
+			menu.showAtMouseEvent(event);
+		}, true);
+		this.registerEvent(this.app.workspace.on('layout-change', () => this.updateBookViews()));
+		this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.updateBookViews()));
+		this.register(() => {
+			this.app.workspace.iterateAllLeaves(leaf => {
+				if (leaf.view instanceof MarkdownView) this.bookViews.delete(leaf.view);
+			});
+			this.updateBookViews();
+		});
 
 		this.addCommand({
 			id: 'Apostrophes',
-			name: 'Apostrophes',
+			name: t('apostrophes'),
 			editorCallback: (editor: Editor) => {
 				this.updateApostrophes(editor);
 			}
@@ -193,6 +234,10 @@ export default class FrenchTypos extends Plugin {
 
 		this.registerEditorExtension(this.createDecorations());
 		this.registerEditorExtension(this.createCursorStyle());
+		this.registerEditorExtension(EditorView.contentAttributes.of((view): Record<string, string> => {
+			const info = view.state.field(editorInfoField, false);
+			return info instanceof MarkdownView && this.bookViews.has(info) && this.settings.bookHyphenate ? { lang: 'fr' } : {};
+		}));
 		this.registerEditorExtension(this.createIndentExclusions());
 		this.registerMarkdownPostProcessor((element, context) => {
 			const observer = observeIndentExclusions(element);
@@ -260,6 +305,10 @@ export default class FrenchTypos extends Plugin {
 				if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 6) this.settings.cursorWidth = value;
 			} else if (key === 'highlightColor') {
 				if (typeof value === 'string' && (value === '' || /^#[0-9a-f]{6}$/i.test(value))) this.settings.highlightColor = value;
+			} else if (key === 'bookFont') {
+				if (typeof value === 'string' && value.length <= 100 && !/[\r\n]/.test(value)) this.settings.bookFont = value.trim() || 'serif';
+			} else if (key === 'bookTextSize') {
+				if (typeof value === 'number' && Number.isInteger(value) && value >= 12 && value <= 40) this.settings.bookTextSize = value;
 			} else if (typeof value === 'boolean') {
 				this.settings[key] = value;
 			}
@@ -270,6 +319,7 @@ export default class FrenchTypos extends Plugin {
 		await this.saveData(this.settings);
 		this.updateParagraphStyles();
 		this.updateStatusBarButton();
+		this.updateBookViews();
 		this.refreshDecorations();
 	}
 
@@ -277,8 +327,108 @@ export default class FrenchTypos extends Plugin {
 		document.body.classList.toggle('french-typos-indent', this.settings.firstLineIndent);
 		document.body.classList.toggle('french-typos-nobr', this.settings.emptytlines === 'invisible');
 		document.body.classList.toggle('french-typos-small_interline', this.settings.emptytlines === 'small');
-		document.body.classList.toggle('french-typos-hyphens', this.settings.hyphenate);
-		if (this.settings.hyphenate) document.documentElement.setAttribute('lang', 'fr');
+	}
+
+	bookStyleProperties(): Record<string, string> {
+		const font = this.settings.bookFont || 'serif';
+		return {
+			'--french-typos-book-font': ['serif', 'sans-serif', 'monospace', 'system-ui'].includes(font) ? font : JSON.stringify(font),
+			'--french-typos-book-size': `${this.settings.bookTextSize}px`,
+			'--french-typos-book-align': this.settings.bookJustify ? 'justify' : 'start',
+			'--french-typos-book-gap': this.settings.bookNoParagraphSpacing ? 'none' : 'block',
+			'--french-typos-book-indent': this.settings.bookIndent ? '2rem' : '0px',
+			'--french-typos-book-hyphens': this.settings.bookHyphenate ? 'auto' : 'manual'
+		};
+	}
+
+	async bookFontChoices(): Promise<string[]> {
+		const fonts = new Set(['serif']);
+		const addFont = (font: unknown) => {
+			if (typeof font === 'string' && font.trim() && font.length <= 100 && !/[\r\n]/.test(font)) fonts.add(font.trim());
+		};
+		addFont(this.settings.bookFont);
+		document.fonts.forEach(font => addFont(font.family.replace(/^["']|["']$/g, '')));
+		try {
+			// Reuse the system-font module shipped with desktop Obsidian.
+			const host = window as unknown as { require?: (name: string) => unknown };
+			const api = host.require?.('get-fonts') as { getFonts?: () => Promise<unknown> } | undefined;
+			if (typeof api?.getFonts !== 'function') throw new Error('System font access is unavailable');
+			const installed: unknown = await api.getFonts();
+			if (!Array.isArray(installed)) throw new Error('Invalid system font list');
+			for (const font of installed as unknown[]) addFont(font);
+		} catch (error) {
+			console.error('French Typos: could not list system fonts', error);
+			new Notice(t('fontsUnavailable'));
+		}
+		return ['serif', ...Array.from(fonts).filter(font => font && font !== 'serif').sort((a, b) => a.localeCompare(b))];
+	}
+
+	async setBookMode(view: MarkdownView, mode: 'source' | 'live' | 'book') {
+		const selections = view.editor.listSelections();
+		const scroll = view.editor.getScrollInfo();
+		await view.leaf.setViewState({ type: 'markdown', state: { ...view.getState(), mode: 'source', source: mode === 'source' } });
+		this.bookViews.delete(view);
+		if (mode === 'book') this.bookViews.add(view);
+		this.updateBookViews();
+		this.refreshDecorations();
+		view.editor.setSelections(selections);
+		view.editor.scrollTo(scroll.left, scroll.top);
+		view.editor.focus();
+	}
+
+	updateBookViews() {
+		this.app.workspace.iterateAllLeaves(leaf => {
+			if (!(leaf.view instanceof MarkdownView)) return;
+			const view = leaf.view;
+			if (view.getMode() !== 'source' || view.getState().source === true) this.bookViews.delete(view);
+			const root = view.containerEl;
+			const active = this.bookViews.has(view);
+			const wasActive = root.classList.contains('french-typos-book-preview');
+			if (active && !wasActive) {
+				const scroller = root.querySelector<HTMLElement>('.cm-scroller');
+				if (scroller) {
+					const style = scroller.win.getComputedStyle(scroller);
+					root.style.setProperty('--french-typos-book-original-font', style.fontFamily);
+					root.style.setProperty('--french-typos-book-original-size', style.fontSize);
+					root.style.setProperty('--french-typos-book-original-height', style.lineHeight);
+				}
+			}
+			root.classList.toggle('french-typos-book-preview', active);
+			for (const [property, value] of Object.entries(this.bookStyleProperties())) {
+				if (active) root.style.setProperty(property, value);
+				else root.style.removeProperty(property);
+			}
+			if (!active) {
+				for (const property of ['font', 'size', 'height']) root.style.removeProperty(`--french-typos-book-original-${property}`);
+			}
+			if (active || wasActive) (view.editor as Editor & { cm?: EditorView }).cm?.requestMeasure();
+		});
+		const button = document.querySelector<HTMLElement>('.status-bar .plugin-editor-status');
+		const current = this.app.workspace.getActiveViewOfType(MarkdownView);
+		this.updateBookSidebars(!!current && this.bookViews.has(current));
+		if (button && current && this.bookViews.has(current)) {
+			if (!button.hasAttribute('data-french-typos-label')) button.setAttribute('data-french-typos-label', button.getAttribute('aria-label') ?? '');
+			button.setAttribute('aria-label', t('bookPreview'));
+		} else if (button?.hasAttribute('data-french-typos-label')) {
+			if (button.getAttribute('aria-label') === t('bookPreview')) button.setAttribute('aria-label', button.getAttribute('data-french-typos-label') ?? '');
+			button.removeAttribute('data-french-typos-label');
+		}
+	}
+
+	updateBookSidebars(active: boolean) {
+		const { leftSplit, rightSplit } = this.app.workspace;
+		if (active && !this.bookSidebars) {
+			this.bookSidebars = { leftCollapsed: leftSplit.collapsed, rightCollapsed: rightSplit.collapsed };
+			leftSplit.collapse();
+			rightSplit.collapse();
+		} else if (!active && this.bookSidebars) {
+			const saved = this.bookSidebars;
+			this.bookSidebars = null;
+			if (saved.leftCollapsed) leftSplit.collapse();
+			else leftSplit.expand();
+			if (saved.rightCollapsed) rightSplit.collapse();
+			else rightSplit.expand();
+		}
 	}
 
 	cursorAttributes(view: EditorView): Record<string, string> {
@@ -407,7 +557,7 @@ export default class FrenchTypos extends Plugin {
 		statusBarItemEl.createSpan({ cls: 'status-bar-item-icon', text: '¶' });
 
 		// Ajouter les attributs pour le tooltip
-		statusBarItemEl.setAttribute("aria-label", "Toggle highlight");
+		statusBarItemEl.setAttribute("aria-label", t('toggleHighlight'));
 		statusBarItemEl.setAttribute("data-tooltip-position", "top");
 	
 		// Mettre à jour l'apparence en fonction de l'état
@@ -503,6 +653,16 @@ export default class FrenchTypos extends Plugin {
 
 }
 
+class BookFontModal extends FuzzySuggestModal<string> {
+	constructor(app: App, private fonts: string[], private choose: (font: string) => Promise<void>) {
+		super(app);
+		this.setPlaceholder(t('chooseFont'));
+	}
+	getItems() { return this.fonts; }
+	getItemText(font: string) { return font === 'serif' ? t('systemSerif') : font; }
+	onChooseItem(font: string) { return this.choose(font); }
+}
+
 class FrenchTyposSettingTab extends PluginSettingTab {
 	override icon = 'french-typos';
 	plugin: FrenchTypos;
@@ -515,81 +675,116 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 	override async setControlValue(key: string, value: unknown) {
 		await super.setControlValue(key, value);
 		this.plugin.updateParagraphStyles();
+		this.plugin.updateBookViews();
+		this.plugin.refreshDecorations();
 	}
 
 	getSettingDefinitions(): SettingDefinitionItem<keyof FrenchTyposSettings>[] {
 		return [
 			{
-				name: 'French Typos works mainly in Live Preview mode.'
-			},
-			{
-				name: 'Apostrophe',
-				desc: 'Activate typographic apostrophe',
-				control: { type: 'toggle', key: 'apostrophe' }
-			},
-			{
-				name: 'Double apostrophes to curly quotes',
-				desc: 'Convert two consecutive apostrophes into “ or ”, closing an already open quote',
-				control: { type: 'toggle', key: 'doubleApostropheQuotes' }
-			},
-			{
-				name: 'French quotation marks and hard spaces',
-				desc: 'Convert standard quotation marks',
-				control: { type: 'toggle', key: 'quotationmarks' }
-			},
-			{
-				name: 'Em dashes (quadratin)',
-				desc: 'Convert "--- " into em dashes —',
-				control: { type: 'toggle', key: 'emdashes' }
-			},
-			{
-				name: 'En dashes (demi-quadratin)',
-				desc: 'Convert "-- " into en dashes –',
-				control: { type: 'toggle', key: 'endashes' }
-			},
-			{
-				name: 'Two Enters for one',
-				desc: 'One Enter create a Markdown paragraph',
-				control: { type: 'toggle', key: 'twoenters' }
-			},
-			{
-				name: 'Simulate Shift+Click on links',
-				desc: 'Display the URL instead of opening',
-				control: { type: 'toggle', key: 'desactivatelinks' }
-			},
-			{
-				name: 'First line indent',
-				desc: 'Indent the first line of paragraphs in Live Preview and Reading view',
-				render: setting => {
-					setting.addToggle(toggle => toggle
-						.setValue(this.plugin.settings.firstLineIndent)
-						.onChange(async value => {
-							this.plugin.settings.firstLineIndent = value;
-							await this.plugin.saveSettings();
-						}));
-				}
-			},
-			{
-				name: 'Empty lines',
-				desc: 'Adjust empty line height in Live Preview. Applies immediately.',
-				control: {
-					type: 'dropdown',
-					key: 'emptytlines',
-					options: { normal: 'Normal', small: 'Small', invisible: 'Invisible' }
-				}
-			},
-			{
-				name: 'Hyphenate French rules',
-				desc: 'French hyphenation in Reading view. Applies immediately.',
-				control: { type: 'toggle', key: 'hyphenate' }
+				type: 'group',
+				heading: t('livePreview'),
+				items: [
+					{
+						name: t('apostrophe'),
+						desc: t('apostropheDescription'),
+						control: { type: 'toggle', key: 'apostrophe' }
+					},
+					{
+						name: t('doubleApostropheQuotes'),
+						desc: t('doubleApostropheQuotesDescription'),
+						control: { type: 'toggle', key: 'doubleApostropheQuotes' }
+					},
+					{
+						name: t('quotationMarks'),
+						desc: t('quotationMarksDescription'),
+						control: { type: 'toggle', key: 'quotationmarks' }
+					},
+					{
+						name: t('emDashes'),
+						desc: t('emDashesDescription'),
+						control: { type: 'toggle', key: 'emdashes' }
+					},
+					{
+						name: t('enDashes'),
+						desc: t('enDashesDescription'),
+						control: { type: 'toggle', key: 'endashes' }
+					},
+					{
+						name: t('twoEnters'),
+						desc: t('twoEntersDescription'),
+						control: { type: 'toggle', key: 'twoenters' }
+					},
+					{
+						name: t('disableLinks'),
+						desc: t('disableLinksDescription'),
+						control: { type: 'toggle', key: 'desactivatelinks' }
+					},
+					{
+						name: t('firstLineIndent'),
+						desc: t('firstLineIndentDescription'),
+						render: setting => {
+							setting.addToggle(toggle => toggle
+								.setValue(this.plugin.settings.firstLineIndent)
+								.onChange(async value => {
+									this.plugin.settings.firstLineIndent = value;
+									await this.plugin.saveSettings();
+								}));
+						}
+					},
+					{
+						name: t('emptyLines'),
+						desc: t('emptyLinesDescription'),
+						control: {
+							type: 'dropdown',
+							key: 'emptytlines',
+							options: { normal: t('normal'), small: t('small'), invisible: t('invisible') }
+						}
+					}
+				]
 			},
 			{
 				type: 'group',
-				heading: 'Highlight',
+				heading: t('bookPreview'),
 				items: [
 					{
-						name: 'Highlight',
-						desc: 'Enable highlight',
+						name: t('font'),
+						desc: t('fontDescription'),
+						render: setting => {
+							setting.addText(text => {
+								text.inputEl.maxLength = 100;
+								text.setPlaceholder('serif').setValue(this.plugin.settings.bookFont).onChange(async value => {
+									this.plugin.settings.bookFont = value.trim() || 'serif';
+									await this.plugin.saveSettings();
+								});
+								setting.addButton(button => button.setButtonText(t('choose')).onClick(async () => {
+									const fonts = await this.plugin.bookFontChoices();
+									new BookFontModal(this.app, fonts, async font => {
+										this.plugin.settings.bookFont = font;
+										text.setValue(font);
+										await this.plugin.saveSettings();
+									}).open();
+								}));
+							});
+						}
+					},
+					{ name: t('justifyParagraphs'), control: { type: 'toggle', key: 'bookJustify' } },
+					{ name: t('noParagraphSpacing'), control: { type: 'toggle', key: 'bookNoParagraphSpacing' } },
+					{ name: t('firstLineIndent'), control: { type: 'toggle', key: 'bookIndent' } },
+					{ name: t('frenchHyphenation'), control: { type: 'toggle', key: 'bookHyphenate' } },
+					{
+						name: t('textSize'),
+						control: { type: 'slider', key: 'bookTextSize', min: 12, max: 40, step: 1, displayFormat: value => t('pixels', { value }) }
+					}
+				]
+			},
+			{
+				type: 'group',
+				heading: t('highlight'),
+				items: [
+					{
+						name: t('highlight'),
+						desc: t('highlightDescription'),
 						render: setting => {
 							setting.addToggle(toggle => toggle
 								.setValue(this.plugin.settings.highlightEnabled)
@@ -601,8 +796,8 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 						}
 					},
 					{
-						name: 'Color',
-						desc: 'Shared color for highlighted spaces, tabs, dashes and cursor. Theme restores the heading color.',
+						name: t('color'),
+						desc: t('colorDescription'),
 						render: setting => {
 							const sample = setting.settingEl.createEl('canvas', { attr: { width: '1', height: '1' } });
 							sample.style.color = 'var(--h1-color, var(--text-normal))';
@@ -621,7 +816,7 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 									this.plugin.settings.highlightColor = value;
 									await this.plugin.saveSettings();
 								}));
-							setting.addButton(button => button.setButtonText('Theme').onClick(async () => {
+							setting.addButton(button => button.setButtonText(t('theme')).onClick(async () => {
 								this.plugin.settings.highlightColor = '';
 								await this.plugin.saveSettings();
 								this.update();
@@ -629,13 +824,13 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 						}
 					},
 					{
-						name: 'Cursor size',
-						desc: 'Left: standard cursor. Choose a thicker cursor for note text.',
+						name: t('cursorSize'),
+						desc: t('cursorSizeDescription'),
 						render: setting => {
 							setting.addSlider(slider => slider
 								.setLimits(0, 6, 1)
 								.setValue(this.plugin.settings.cursorWidth)
-								.setDisplayFormat(value => value === 0 ? 'Standard' : `${value} px`)
+								.setDisplayFormat(value => value === 0 ? t('standard') : t('pixels', { value }))
 								.setInstant(true)
 								.onChange(async value => {
 									this.plugin.settings.cursorWidth = value;
@@ -644,8 +839,8 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 						}
 					},
 					{
-						name: 'Button',
-						desc: 'Show on/off button in status bar',
+						name: t('button'),
+						desc: t('buttonDescription'),
 						render: setting => {
 							setting.addToggle(toggle => toggle
 								.setValue(this.plugin.settings.highlightButton)
