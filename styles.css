@@ -33,6 +33,12 @@ body.french-typos-nobr .workspace-leaf-content[data-type="markdown"] .markdown-s
 
 
 /* highlight */
+.workspace-leaf-content[data-type="markdown"] .markdown-source-view.mod-cm6 .cm-editor.french-typos-bold-cursor .cm-cursor {
+    border-left-width: var(--french-typos-cursor-width);
+    border-left-color: var(--french-typos-highlight-color);
+    margin-left: calc(var(--french-typos-cursor-width) / -2);
+}
+
 body.french-typos-highlight .workspace-leaf-content[data-type="markdown"] .cm-line .invisible-char,
 body.french-typos-highlight .workspace-leaf-content[data-type="markdown"] .cm-line .french-typos-tab-char {
     position: relative;
@@ -44,17 +50,15 @@ body.french-typos-highlight .workspace-leaf-content[data-type="markdown"] .cm-li
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    color: rgb(84, 154, 204);
+    color: var(--french-typos-highlight-color);
     pointer-events: none;
 }
 body.french-typos-highlight .workspace-leaf-content[data-type="markdown"] .cm-line .french-typos-tab-char::after {
     content: '→';
 }
-body.french-typos-highlight .workspace-leaf-content[data-type="markdown"] .cm-line .en-dash-char {
-    color: rgb(84, 154, 204);
-}
+body.french-typos-highlight .workspace-leaf-content[data-type="markdown"] .cm-line .en-dash-char,
 body.french-typos-highlight .workspace-leaf-content[data-type="markdown"] .cm-line .em-dash-char {
-    color: rgb(107, 2, 2);
+    color: var(--french-typos-highlight-color);
 }
 
 

@@ -150,15 +150,42 @@ const settings = Array.from(definitions).flatMap(definition => Array.from(defini
 assert.equal(settings.filter(definition => definition.control).map(definition => definition.control.key).sort().join(','),
 	'apostrophe,desactivatelinks,doubleApostropheQuotes,emdashes,emptytlines,endashes,hyphenate,quotationmarks,twoenters');
 assert.equal(typeof settings.find(definition => definition.name === 'Highlight').render, 'function');
-assert.equal(typeof settings.find(definition => definition.name === 'Highlight status bar button').render, 'function');
+assert.equal(typeof settings.find(definition => definition.name === 'Button').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'First line indent').render, 'function');
+assert.equal(typeof settings.find(definition => definition.name === 'Cursor size').render, 'function');
+assert.equal(typeof settings.find(definition => definition.name === 'Color').render, 'function');
+for (const name of ['Empty lines', 'Hyphenate French rules']) {
+	assert.doesNotMatch(settings.find(definition => definition.name === name).desc, /reload/i);
+}
+assert.deepEqual(Array.from(Array.from(definitions).find(definition => definition.heading === 'Highlight').items, item => item.name),
+	['Highlight', 'Color', 'Cursor size', 'Button']);
 console.log('Settings search: existing settings are declared and highlight callbacks remain available.');
+
+plugin.settings = { cursorWidth: 3, highlightColor: '' };
+const cursorState = noteState({ doc: 'Normal paragraph' });
+const automaticCursor = plugin.cursorAttributes({ state: cursorState });
+assert.equal(automaticCursor.class, 'french-typos-bold-cursor');
+assert.ok(automaticCursor.style.includes('3px'));
+assert.ok(automaticCursor.style.includes('var(--h1-color, var(--text-normal))'));
+plugin.settings.highlightColor = '#12abEF';
+assert.ok(plugin.cursorAttributes({ state: cursorState }).style.includes('#12abEF'));
+const cursorYaml = '---\ntitle: note\n---\nBody';
+for (const anchor of [0, 5]) {
+	assert.equal(plugin.cursorAttributes({ state: noteState({ doc: cursorYaml, selection: { anchor } }) }).class, undefined);
+}
+assert.equal(plugin.cursorAttributes({ state: noteState({ doc: cursorYaml, selection: { anchor: cursorYaml.length } }) }).class,
+	'french-typos-bold-cursor');
+assert.deepEqual({ ...plugin.cursorAttributes({ state: EditorState.create({ doc: 'Settings editor' }) }) }, {});
+plugin.settings.cursorWidth = 0;
+assert.equal(plugin.cursorAttributes({ state: cursorState }).class, undefined);
+assert.ok(plugin.cursorAttributes({ state: cursorState }).style.includes('#12abEF'), 'Color must remain available to highlighted characters with a standard cursor');
+console.log('Bold cursor: automatic or custom color, YAML and foreign editors excluded, standard width restores native styling.');
 
 async function checkLoadedSettings() {
 	const defaults = {
 		apostrophe: true, doubleApostropheQuotes: false, quotationmarks: true, emdashes: true, endashes: true,
 		twoenters: false, desactivatelinks: true, hyphenate: true, firstLineIndent: true, emptytlines: 'small',
-		highlightEnabled: true, highlightButton: true
+		highlightEnabled: true, highlightButton: true, cursorWidth: 0, highlightColor: ''
 	};
 	for (const data of [null, undefined, [], 'invalid', 42, { apostrophe: 'false', doubleApostropheQuotes: 'true', firstLineIndent: 'false', emptytlines: 'invalid' }]) {
 		plugin.loadData = async () => data;
@@ -169,7 +196,7 @@ async function checkLoadedSettings() {
 		const saved = {
 			apostrophe: false, doubleApostropheQuotes: true, quotationmarks: false, emdashes: false, endashes: false,
 			twoenters: true, desactivatelinks: false, hyphenate: false, firstLineIndent: false, emptytlines,
-			highlightEnabled: false, highlightButton: false
+			highlightEnabled: false, highlightButton: false, cursorWidth: 3, highlightColor: '#12abEF'
 		};
 		plugin.loadData = async () => saved;
 		await plugin.loadSettings();
@@ -178,6 +205,22 @@ async function checkLoadedSettings() {
 	plugin.loadData = async () => ({ apostrophe: false });
 	await plugin.loadSettings();
 	assert.deepEqual({ ...plugin.settings }, { ...defaults, apostrophe: false });
+	for (const cursorWidth of [-1, 7, 2.5, NaN, Infinity, '3', true]) {
+		plugin.loadData = async () => ({ cursorWidth });
+		await plugin.loadSettings();
+		assert.equal(plugin.settings.cursorWidth, 0);
+	}
+	for (const highlightColor of ['red', '#123', '#123456; color: red', 42, true]) {
+		plugin.loadData = async () => ({ highlightColor });
+		await plugin.loadSettings();
+		assert.equal(plugin.settings.highlightColor, '');
+	}
+	plugin.loadData = async () => ({ cursorColor: '#123456' });
+	await plugin.loadSettings();
+	assert.equal(plugin.settings.highlightColor, '#123456', 'Preserve the previously saved cursor color');
+	plugin.loadData = async () => ({ cursorColor: '#123456', highlightColor: '#abcdef' });
+	await plugin.loadSettings();
+	assert.equal(plugin.settings.highlightColor, '#abcdef');
 	plugin.loadData = async () => { throw new Error('Cannot read settings'); };
 	await assert.rejects(() => plugin.loadSettings(), /Cannot read settings/);
 	console.log('Settings loading: saved values preserved; missing or invalid values use defaults; read errors propagate.');

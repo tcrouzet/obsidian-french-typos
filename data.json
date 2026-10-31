@@ -10,5 +10,7 @@
   "firstLineIndent": true,
   "emptytlines": "small",
   "highlightEnabled": true,
-  "highlightButton": false
+  "highlightButton": false,
+  "cursorWidth": 4,
+  "highlightColor": ""
 }

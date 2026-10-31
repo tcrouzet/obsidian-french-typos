@@ -1,6 +1,6 @@
 import { App, Editor, MarkdownView, MarkdownRenderChild, PluginSettingTab, Plugin, SettingDefinitionItem, addIcon, editorInfoField } from 'obsidian';
-import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate } from '@codemirror/view';
-import { RangeSetBuilder, StateEffect } from '@codemirror/state';
+import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, drawSelection } from '@codemirror/view';
+import { Compartment, RangeSetBuilder, StateEffect } from '@codemirror/state';
 
 const refreshHighlight = StateEffect.define<null>();
 
@@ -23,6 +23,8 @@ interface FrenchTyposSettings {
 	emptytlines: string;
 	highlightEnabled: boolean;
 	highlightButton: boolean;
+	cursorWidth: number;
+	highlightColor: string;
 }
 
 const DEFAULT_SETTINGS: FrenchTyposSettings = {
@@ -38,6 +40,8 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	emptytlines: 'small',
 	highlightEnabled: true,
 	highlightButton: true,
+	cursorWidth: 0,
+	highlightColor: '',
 }
 
 function doubleApostropheQuote(beforeCursor: string): string | null {
@@ -73,8 +77,8 @@ export default class FrenchTypos extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
-		this.updateFirstLineIndent();
-		this.register(() => document.body.classList.remove('french-typos-indent'));
+		this.updateParagraphStyles();
+		this.register(() => document.body.classList.remove('french-typos-indent', 'french-typos-nobr', 'french-typos-small_interline', 'french-typos-hyphens'));
 
 		addIcon('french-typos', '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 6-6 6 6 6m8-12-6 6 6 6"/></svg>');
 		this.addSettingTab(new FrenchTyposSettingTab(this.app, this));
@@ -183,22 +187,12 @@ export default class FrenchTypos extends Plugin {
 	
 		}, true);
 
-		if (this.settings.emptytlines == "invisible") {
-			document.body.classList.add('french-typos-nobr');
-		}else if (this.settings.emptytlines == "small"){
-			document.body.classList.add('french-typos-small_interline');
-		}
-
-		if (this.settings.hyphenate) {
-			await this.setLanguage();
-			document.body.classList.add('french-typos-hyphens');
-		}
-
 		// Highlighting zone
 		document.body.classList.add('french-typos-highlight');
 
 
 		this.registerEditorExtension(this.createDecorations());
+		this.registerEditorExtension(this.createCursorStyle());
 		this.registerEditorExtension(this.createIndentExclusions());
 		this.registerMarkdownPostProcessor((element, context) => {
 			const observer = observeIndentExclusions(element);
@@ -250,21 +244,22 @@ export default class FrenchTypos extends Plugin {
 		return makdown.replace(/\[(.*?)\]\(.*?\)/g, '$1');
 	}
 
-	async setLanguage() {
-        document.documentElement.setAttribute('lang', 'fr');
-    }
-
 	async loadSettings() {
 		const data: unknown = await this.loadData();
 		this.settings = { ...DEFAULT_SETTINGS };
 		if (typeof data !== 'object' || data === null) return;
 
 		for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof FrenchTyposSettings)[]) {
-			const value = (data as Record<string, unknown>)[key];
+			const saved = data as Record<string, unknown>;
+			const value = key === 'highlightColor' ? saved.highlightColor ?? saved.cursorColor : saved[key];
 			if (key === 'emptytlines') {
 				if (value === 'normal' || value === 'small' || value === 'invisible') {
 					this.settings.emptytlines = value;
 				}
+			} else if (key === 'cursorWidth') {
+				if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 6) this.settings.cursorWidth = value;
+			} else if (key === 'highlightColor') {
+				if (typeof value === 'string' && (value === '' || /^#[0-9a-f]{6}$/i.test(value))) this.settings.highlightColor = value;
 			} else if (typeof value === 'boolean') {
 				this.settings[key] = value;
 			}
@@ -273,12 +268,50 @@ export default class FrenchTypos extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-		this.updateFirstLineIndent();
+		this.updateParagraphStyles();
 		this.updateStatusBarButton();
+		this.refreshDecorations();
 	}
 
-	updateFirstLineIndent() {
+	updateParagraphStyles() {
 		document.body.classList.toggle('french-typos-indent', this.settings.firstLineIndent);
+		document.body.classList.toggle('french-typos-nobr', this.settings.emptytlines === 'invisible');
+		document.body.classList.toggle('french-typos-small_interline', this.settings.emptytlines === 'small');
+		document.body.classList.toggle('french-typos-hyphens', this.settings.hyphenate);
+		if (this.settings.hyphenate) document.documentElement.setAttribute('lang', 'fr');
+	}
+
+	cursorAttributes(view: EditorView): Record<string, string> {
+		if (!(view.state.field(editorInfoField, false) instanceof MarkdownView)) return {};
+		const style = `--french-typos-highlight-color: ${this.settings.highlightColor || 'var(--h1-color, var(--text-normal))'};`;
+		const bodyStart = noteBodyStart(view.state.doc.toString());
+		if (!this.settings.cursorWidth || view.state.selection.ranges.some(range => range.from < bodyStart)) return { style };
+		return {
+			class: 'french-typos-bold-cursor',
+			style: `${style} --french-typos-cursor-width: ${this.settings.cursorWidth}px;`
+		};
+	}
+
+	createCursorStyle() {
+		const attributes = (view: EditorView) => this.cursorAttributes(view);
+		const compartment = new Compartment();
+		const standard: [] = [];
+		const drawing = drawSelection();
+		return [compartment.of(standard), EditorView.editorAttributes.of(attributes), ViewPlugin.fromClass(class {
+			destroyed = false;
+			constructor(view: EditorView) { this.sync(view); }
+			update(update: ViewUpdate) { this.sync(update.view); }
+			sync(view: EditorView) {
+				if (compartment.get(view.state) === (attributes(view).class ? drawing : standard)) return;
+				// Reconfigure after the current editor update has finished.
+				queueMicrotask(() => {
+					if (this.destroyed) return;
+					const desired = attributes(view).class ? drawing : standard;
+					if (compartment.get(view.state) !== desired) view.dispatch({ effects: compartment.reconfigure(desired) });
+				});
+			}
+			destroy() { this.destroyed = true; }
+		})];
 	}
 
 	createIndentExclusions() {
@@ -479,6 +512,11 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	override async setControlValue(key: string, value: unknown) {
+		await super.setControlValue(key, value);
+		this.plugin.updateParagraphStyles();
+	}
+
 	getSettingDefinitions(): SettingDefinitionItem<keyof FrenchTyposSettings>[] {
 		return [
 			{
@@ -533,7 +571,7 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 			},
 			{
 				name: 'Empty lines',
-				desc: 'Reload your Vault to process…',
+				desc: 'Adjust empty line height in Live Preview. Applies immediately.',
 				control: {
 					type: 'dropdown',
 					key: 'emptytlines',
@@ -542,12 +580,12 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 			},
 			{
 				name: 'Hyphenate French rules',
-				desc: 'Only in Reading view (reload your Vault to process)',
+				desc: 'French hyphenation in Reading view. Applies immediately.',
 				control: { type: 'toggle', key: 'hyphenate' }
 			},
 			{
 				type: 'group',
-				heading: 'Highlight hidden hardspaces, tabs and dashes',
+				heading: 'Highlight',
 				items: [
 					{
 						name: 'Highlight',
@@ -563,7 +601,50 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 						}
 					},
 					{
-						name: 'Highlight status bar button',
+						name: 'Color',
+						desc: 'Shared color for highlighted spaces, tabs, dashes and cursor. Theme restores the heading color.',
+						render: setting => {
+							const sample = setting.settingEl.createEl('canvas', { attr: { width: '1', height: '1' } });
+							sample.style.color = 'var(--h1-color, var(--text-normal))';
+							const context = sample.getContext('2d');
+							let themeColor = '#000000';
+							if (context) {
+								context.fillStyle = sample.win.getComputedStyle(sample).color;
+								context.fillRect(0, 0, 1, 1);
+								themeColor = '#' + Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3)
+									.map(channel => channel.toString(16).padStart(2, '0')).join('');
+							}
+							sample.remove();
+							setting.addColorPicker(color => color
+								.setValue(this.plugin.settings.highlightColor || themeColor)
+								.onChange(async value => {
+									this.plugin.settings.highlightColor = value;
+									await this.plugin.saveSettings();
+								}));
+							setting.addButton(button => button.setButtonText('Theme').onClick(async () => {
+								this.plugin.settings.highlightColor = '';
+								await this.plugin.saveSettings();
+								this.update();
+							}));
+						}
+					},
+					{
+						name: 'Cursor size',
+						desc: 'Left: standard cursor. Choose a thicker cursor for note text.',
+						render: setting => {
+							setting.addSlider(slider => slider
+								.setLimits(0, 6, 1)
+								.setValue(this.plugin.settings.cursorWidth)
+								.setDisplayFormat(value => value === 0 ? 'Standard' : `${value} px`)
+								.setInstant(true)
+								.onChange(async value => {
+									this.plugin.settings.cursorWidth = value;
+									await this.plugin.saveSettings();
+								}));
+						}
+					},
+					{
+						name: 'Button',
 						desc: 'Show on/off button in status bar',
 						render: setting => {
 							setting.addToggle(toggle => toggle

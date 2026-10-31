@@ -41,13 +41,15 @@ Dans **Réglages → French Typos**, ajuster la présentation à votre façon d�
 - **Hyphenate French rules** active la césure française en mode Lecture, pour répartir les mots en fin de ligne.
 - **Two Enters for one** insère deux sauts de ligne à chaque appui sur Entrée, pour créer un paragraphe Markdown. L’option est désactivée par défaut.
 
-Recharger le coffre après avoir modifié **Empty lines** ou **Hyphenate French rules**. Pour harmoniser ensuite le Markdown, **Two Enters for one** peut être associé au plugin [Linter](https://github.com/platers/obsidian-linter).
+Les changements de présentation s’appliquent immédiatement, sans recharger le coffre. Pour harmoniser ensuite le Markdown, **Two Enters for one** peut être associé au plugin [Linter](https://github.com/platers/obsidian-linter).
 
 ## Voir les espaces invisibles
 
-Une espace insécable ressemble à une espace ordinaire. French Typos la met en évidence, ainsi que les tirets cadratins et demi-cadratins, pour faciliter la relecture. Les tabulations apparaissent avec une flèche bleue `→` dans l’éditeur, sans modifier le texte ni leur largeur.
+Une espace insécable ressemble à une espace ordinaire. French Typos la met en évidence, ainsi que les tirets cadratins et demi-cadratins, pour faciliter la relecture. Les tabulations apparaissent avec une flèche `→` dans l’éditeur, sans modifier le texte ni leur largeur.
 
-Cliquer sur **¶**, dans la barre d’état, pour activer ou désactiver cette mise en évidence. Les options **Highlight** et **Highlight status bar button**, dans les réglages, permettent de choisir le surlignage et l’affichage du bouton.
+Cliquer sur **¶**, dans la barre d’état, pour activer ou désactiver cette mise en évidence. Les options **Highlight** et **Button**, dans les réglages, permettent de choisir le surlignage et l’affichage du bouton.
+
+Dans le groupe **Highlight**, **Cursor size** épaissit le curseur du texte des notes jusqu’à 6 pixels. Tout à gauche, **Standard** rétablit le curseur habituel. **Color** choisit une couleur commune au curseur, aux espaces insécables, aux tabulations et aux tirets mis en évidence ; le bouton **Theme** rétablit la couleur des titres H1 du thème, suivie automatiquement en clair et en sombre. Le curseur reste standard dans le frontmatter YAML et les champs de réglages. Cette option fonctionne indépendamment de la mise en évidence des caractères invisibles.
 
 ## Installer avec BRAT
 
