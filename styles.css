@@ -120,6 +120,10 @@ body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-boo
     display: block;
 }
 
+body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .image-embed[data-french-typos-caption] {
+    flex-direction: column;
+}
+
 body.obsidian-app .workspace-leaf-content[data-type="markdown"].french-typos-book-preview .image-embed[data-french-typos-caption]::after {
     content: attr(data-french-typos-caption);
     display: block;
