@@ -463,7 +463,7 @@ export default class FrenchTypos extends Plugin {
 		if (!(view.state.field(editorInfoField, false) instanceof MarkdownView)) return {};
 		const style = `--french-typos-highlight-color: ${this.settings.highlightColor || 'var(--h1-color, var(--text-normal))'};`;
 		const bodyStart = noteBodyStart(view.state.doc.toString());
-		if (!this.settings.cursorWidth || view.state.selection.ranges.some(range => range.from < bodyStart)) return { style };
+		if (!this.settings.cursorWidth || view.state.selection.ranges.some(range => !range.empty || range.from < bodyStart)) return { style };
 		return {
 			class: 'french-typos-bold-cursor',
 			style: `${style} --french-typos-cursor-width: ${this.settings.cursorWidth}px;`

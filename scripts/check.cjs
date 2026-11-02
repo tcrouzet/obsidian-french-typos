@@ -272,6 +272,14 @@ const automaticCursor = plugin.cursorAttributes({ state: cursorState });
 assert.equal(automaticCursor.class, 'french-typos-bold-cursor');
 assert.ok(automaticCursor.style.includes('3px'));
 assert.ok(automaticCursor.style.includes('var(--h1-color, var(--text-normal))'));
+for (const doc of ['Normal paragraph', '```text\nalpha beta\n```']) {
+	const start = doc.startsWith('```') ? 8 : 0;
+	for (const [anchor, head] of [[start, start + 5], [start + 5, start]]) {
+		const selected = noteState({ doc, selection: { anchor, head } });
+		assert.equal(plugin.cursorAttributes({ state: selected }).class, undefined, 'Text selection must use native rendering');
+	}
+}
+
 plugin.settings.highlightColor = '#12abEF';
 assert.ok(plugin.cursorAttributes({ state: cursorState }).style.includes('#12abEF'));
 const cursorYaml = '---\ntitle: note\n---\nBody';
