@@ -119,6 +119,17 @@ for (const [doc, expected] of [
 	assert.deepEqual(decorations(instance, doc.length).map(([from]) => from), expected);
 }
 console.log('Empty lines: empty document, consecutive, trailing and whitespace-only lines pass.');
+for (const doc of ['![Caption](photo.jpg)', '![[photo.jpg|Caption]]', 'Text ![Caption](photo.jpg)', '![Caption being edited']) {
+	const state = noteState({ doc });
+	for (const enabled of [true, false]) {
+		plugin.settings.highlightEnabled = enabled;
+		const instance = plugin.createDecorations().create({ state, visibleRanges: [{ from: 0, to: doc.length }] });
+		assert.deepEqual(decorations(instance, doc.length), [[0, 0, 'french-typos-media-line']]);
+	}
+}
+plugin.settings.highlightEnabled = true;
+console.log('Image source lines remain excluded during caption editing, including incomplete image syntax.');
+
 
 let state = noteState({ doc: 'a\u00a0—–\t\n\nb\n', selection: { anchor: 2 } });
 const view = { state, visibleRanges: [{ from: 0, to: state.doc.length }] };

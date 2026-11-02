@@ -516,6 +516,7 @@ export default class FrenchTypos extends Plugin {
 		const emDashDecoration = Decoration.mark({ class: 'em-dash-char' });
 		const enDashDecoration = Decoration.mark({ class: 'en-dash-char' });
 		const emptyLineDecoration = Decoration.line({ class: 'french-typos-empty-line' });
+		const mediaLineDecoration = Decoration.line({ class: 'french-typos-media-line' });
 		const frontmatterDecoration = Decoration.line({ class: 'french-typos-frontmatter' });
 		const highlightEnabled = () => this.settings.highlightEnabled;
 
@@ -549,6 +550,10 @@ export default class FrenchTypos extends Plugin {
 						}
 						if ((i === 0 || text[i - 1] === '\n') && view.state.doc.lineAt(from + i).length === 0) {
 							builder.add(from + i, from + i, emptyLineDecoration);
+						}
+						if (i === 0 || text[i - 1] === '\n') {
+							const line = view.state.doc.lineAt(from + i);
+							if (line.from === from + i && line.text.includes('![')) builder.add(line.from, line.from, mediaLineDecoration);
 						}
 						if (!enabled) continue;
 						if (text[i] === '\u00A0') {
