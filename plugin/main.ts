@@ -17,6 +17,7 @@ interface FrenchTyposSettings {
 	doubleApostropheQuotes: boolean;
 	quotationmarks: boolean;
 	automaticHardSpace: boolean;
+	automaticEllipsis: boolean;
 	emdashes: boolean;
 	endashes: boolean;
 	twoenters: boolean;
@@ -40,6 +41,7 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	doubleApostropheQuotes: false,
 	quotationmarks: true,
 	automaticHardSpace: true,
+	automaticEllipsis: true,
 	emdashes: true,
 	endashes: true,
 	twoenters: false,
@@ -166,7 +168,7 @@ export default class FrenchTypos extends Plugin {
 		this.registerDomEvent(document, 'keydown', (event: KeyboardEvent) => {
 			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
-			if (!activeView || activeView.getMode() !== 'source' || !activeView.editor.hasFocus() || !event.composedPath().includes(activeView.contentEl)) {
+			if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || !activeView || activeView.getMode() !== 'source' || !activeView.editor.hasFocus() || !event.composedPath().includes(activeView.contentEl)) {
 				return;
 			}
 
@@ -178,12 +180,21 @@ export default class FrenchTypos extends Plugin {
 				if (editor.listSelections().some(({ anchor, head }) =>
 					editor.posToOffset(anchor) < bodyStart || editor.posToOffset(head) < bodyStart)) return;
 				const cursor = editor.getCursor();
-				if (this.settings.automaticHardSpace && /^[?!:;]$/.test(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing && !editor.getSelection()) {
+				if (((this.settings.automaticHardSpace && /^[?!:;]$/.test(event.key)) || (this.settings.automaticEllipsis && event.key === '.')) && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing && !editor.getSelection()) {
 					const cm = (editor as Editor & { cm?: EditorView }).cm;
 					if (cm && event.target instanceof Element && event.target.closest('[contenteditable="true"]') === cm.contentDOM) {
 						const node = cm.domAtPos(editor.posToOffset(cursor)).node;
 						const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement;
 						if (!element?.closest('.HyperMD-codeblock, .cm-inline-code')) {
+							if (event.key === '.') {
+								if (cursor.ch >= 2 && editor.getRange({ line: cursor.line, ch: cursor.ch - 2 }, cursor) === '..') {
+									event.preventDefault();
+									editor.replaceRange('…', { line: cursor.line, ch: cursor.ch - 2 }, cursor);
+									editor.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
+								}
+								return;
+							}
+
 							const previous = cursor.ch ? editor.getRange({ line: cursor.line, ch: cursor.ch - 1 }, cursor) : '';
 							const start = { line: cursor.line, ch: cursor.ch - (previous === ' ' ? 1 : 0) };
 							const insertion = punctuationSpace(previous) + event.key;
@@ -239,7 +250,7 @@ export default class FrenchTypos extends Plugin {
 					editor.setCursor({ line: cursor.line + 2, ch: cursor.ch });
 				}
 			}
-		});
+		}, true);
 
 		this.registerDomEvent(document, 'click', (event: MouseEvent) => {
 
@@ -759,6 +770,11 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 						name: t('automaticHardSpace'),
 						desc: t('automaticHardSpaceDescription'),
 						control: { type: 'toggle', key: 'automaticHardSpace' }
+					},
+					{
+						name: t('automaticEllipsis'),
+						desc: t('automaticEllipsisDescription'),
+						control: { type: 'toggle', key: 'automaticEllipsis' }
 					},
 					{
 						name: t('emDashes'),

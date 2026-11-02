@@ -48,5 +48,7 @@
   "buttonDescription": "Afficher le bouton d’activation dans la barre d’état.",
   "pixels": "{value} px",
   "automaticHardSpace": "Espace insécable automatique avant : ? ! ;",
-  "automaticHardSpaceDescription": "Insérer une espace insécable avant ces ponctuations pendant la saisie, hors blocs de code et frontmatter YAML. Convertir une espace normale déjà présente, sans doublon."
+  "automaticHardSpaceDescription": "Insérer une espace insécable avant ces ponctuations pendant la saisie, hors blocs de code et frontmatter YAML. Convertir une espace normale déjà présente, sans doublon.",
+  "automaticEllipsis": "Points de suspension automatiques",
+  "automaticEllipsisDescription": "Convertir ... en … pendant la saisie, hors blocs de code et frontmatter YAML."
 }

@@ -204,7 +204,7 @@ assert.equal(tab.icon, 'french-typos');
 const definitions = tab.getSettingDefinitions();
 const settings = Array.from(definitions).flatMap(definition => Array.from(definition.items || [definition]));
 assert.equal(settings.filter(definition => definition.control).map(definition => definition.control.key).sort().join(','),
-	'apostrophe,automaticHardSpace,bookHyphenate,bookIndent,bookJustify,bookNoParagraphSpacing,bookTextSize,desactivatelinks,doubleApostropheQuotes,emdashes,emptytlines,endashes,quotationmarks,twoenters');
+	'apostrophe,automaticEllipsis,automaticHardSpace,bookHyphenate,bookIndent,bookJustify,bookNoParagraphSpacing,bookTextSize,desactivatelinks,doubleApostropheQuotes,emdashes,emptytlines,endashes,quotationmarks,twoenters');
 assert.equal(typeof settings.find(definition => definition.name === 'Highlight').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'Button').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'First line indent').render, 'function');
@@ -301,7 +301,7 @@ console.log('Bold cursor: automatic or custom color, YAML and foreign editors ex
 async function checkLoadedSettings() {
 	const defaults = {
 		...bookDefaults,
-		automaticHardSpace: true, apostrophe: true, doubleApostropheQuotes: false, quotationmarks: true, emdashes: true, endashes: true,
+		automaticEllipsis: true, automaticHardSpace: true, apostrophe: true, doubleApostropheQuotes: false, quotationmarks: true, emdashes: true, endashes: true,
 		twoenters: false, desactivatelinks: true, firstLineIndent: true, emptytlines: 'small',
 		highlightEnabled: true, highlightButton: true, cursorWidth: 0, highlightColor: ''
 	};
@@ -313,7 +313,7 @@ async function checkLoadedSettings() {
 	for (const emptytlines of ['normal', 'small', 'invisible']) {
 		const saved = {
 			...bookDefaults, bookFont: 'Palatino', bookTextSize: 24, bookJustify: false, bookNoParagraphSpacing: false, bookIndent: false, bookHyphenate: false,
-			automaticHardSpace: false, apostrophe: false, doubleApostropheQuotes: true, quotationmarks: false, emdashes: false, endashes: false,
+			automaticEllipsis: false, automaticHardSpace: false, apostrophe: false, doubleApostropheQuotes: true, quotationmarks: false, emdashes: false, endashes: false,
 			twoenters: true, desactivatelinks: false, firstLineIndent: false, emptytlines,
 			highlightEnabled: false, highlightButton: false, cursorWidth: 3, highlightColor: '#12abEF'
 		};
