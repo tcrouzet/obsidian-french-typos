@@ -43,7 +43,7 @@ function noteState(config) {
 }
 const moduleForCheck = { exports: {} };
 runInNewContext(buildSync({
-	stdin: { contents: source + "\nexport { FrenchTyposSettingTab, BookFontModal, doubleApostropheQuote, noteBodyStart, imageCaption }; export { setLocale, t } from './i18n';", loader: 'ts', resolveDir: process.cwd() + '/plugin' },
+	stdin: { contents: source + "\nexport { FrenchTyposSettingTab, BookFontModal, doubleApostropheQuote, noteBodyStart, imageCaption, updateNoteElements }; export { setLocale, t } from './i18n';", loader: 'ts', resolveDir: process.cwd() + '/plugin' },
 	bundle: true, write: false, format: 'cjs', external: ['obsidian', '@codemirror/state', '@codemirror/view']
 }).outputFiles[0].text, {
 	module: moduleForCheck,
@@ -64,6 +64,27 @@ for (const [alt, src, expected] of [
 	['300x200', 'photo.jpg', ''],
 	['', 'photo.jpg', '']
 ]) assert.equal(moduleForCheck.exports.imageCaption(alt, src), expected);
+
+const imageAttributes = new Map([['alt', 'Caption'], ['src', 'image.jpg']]);
+let imageWrites = 0;
+const imageElement = {
+	matches: selector => selector === '.image-embed',
+	querySelectorAll: () => [],
+	getAttribute: name => imageAttributes.get(name) ?? null,
+	setAttribute: (name, value) => { imageWrites++; imageAttributes.set(name, value); },
+	removeAttribute: name => { imageWrites++; imageAttributes.delete(name); }
+};
+assert.equal(moduleForCheck.exports.updateNoteElements(imageElement), true);
+assert.equal(imageWrites, 1);
+assert.equal(moduleForCheck.exports.updateNoteElements(imageElement), false);
+assert.equal(imageWrites, 1, 'Unchanged captions must not mutate the editor DOM');
+imageAttributes.set('alt', 'Updated caption');
+assert.equal(moduleForCheck.exports.updateNoteElements(imageElement), true);
+assert.equal(imageAttributes.get('data-french-typos-caption'), 'Updated caption');
+imageAttributes.set('alt', '');
+assert.equal(moduleForCheck.exports.updateNoteElements(imageElement), true);
+assert.equal(imageAttributes.has('data-french-typos-caption'), false);
+console.log('Caption updates: no repeated DOM writes; text changes and removal signal layout changes.');
 
 const plugin = new moduleForCheck.exports.default();
 plugin.settings = { highlightEnabled: true };

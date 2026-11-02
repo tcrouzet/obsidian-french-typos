@@ -73,26 +73,38 @@ function imageCaption(alt: string, src: string): string {
 	return alt && alt !== src && alt !== src.split('/').pop() && !/^\d+(?:x\d+)?$/.test(alt) ? alt : '';
 }
 
-function updateNoteElements(element: HTMLElement) {
+function updateNoteElements(element: HTMLElement): boolean {
+	let changed = false;
 	const images = element.matches('.image-embed') ? [element] : Array.from(element.querySelectorAll<HTMLElement>('.image-embed'));
 	for (const image of images) {
 		const alt = image.getAttribute('alt')?.trim() ?? '';
 		const src = image.getAttribute('src') ?? '';
 		const caption = imageCaption(alt, src);
-		if (caption) image.setAttribute('data-french-typos-caption', caption);
-		else image.removeAttribute('data-french-typos-caption');
+		if ((image.getAttribute('data-french-typos-caption') ?? '') !== caption) {
+			if (caption) image.setAttribute('data-french-typos-caption', caption);
+			else image.removeAttribute('data-french-typos-caption');
+			changed = true;
+		}
 	}
 	const paragraphs = element.matches('.cm-line, p') ? [element] : Array.from(element.querySelectorAll<HTMLElement>(element.matches('.cm-content') ? ':scope > .cm-line' : '.cm-line, p'));
 	for (const paragraph of paragraphs) {
 		if (paragraph.closest('figure, figcaption, .image-embed')) continue;
-		paragraph.classList.toggle('french-typos-no-indent', !!paragraph.querySelector('hr, img:not(.cm-widgetBuffer), .image-embed, .cm-image, figure, figcaption'));
+		const excluded = !!paragraph.querySelector('hr, img:not(.cm-widgetBuffer), .image-embed, .cm-image, figure, figcaption');
+		if (paragraph.classList.contains('french-typos-no-indent') !== excluded) {
+			paragraph.classList.toggle('french-typos-no-indent', excluded);
+			changed = true;
+		}
 	}
+	return changed;
 }
 
-function observeIndentExclusions(element: HTMLElement): MutationObserver {
-	const observer = new MutationObserver(() => updateNoteElements(element));
+function observeIndentExclusions(element: HTMLElement, onLayoutChange?: () => void): MutationObserver {
+	const update = () => {
+		if (updateNoteElements(element)) onLayoutChange?.();
+	};
+	const observer = new MutationObserver(update);
 	observer.observe(element, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'alt', 'src'] });
-	updateNoteElements(element);
+	update();
 	return observer;
 }
 
@@ -486,7 +498,7 @@ export default class FrenchTypos extends Plugin {
 
 			constructor(view: EditorView) {
 				if (view.state.field(editorInfoField, false) instanceof MarkdownView) {
-					this.observer = observeIndentExclusions(view.contentDOM);
+					this.observer = observeIndentExclusions(view.contentDOM, () => view.requestMeasure());
 				}
 			}
 
