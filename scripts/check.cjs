@@ -43,7 +43,7 @@ function noteState(config) {
 }
 const moduleForCheck = { exports: {} };
 runInNewContext(buildSync({
-	stdin: { contents: source + "\nexport { FrenchTyposSettingTab, BookFontModal, doubleApostropheQuote, noteBodyStart }; export { setLocale, t } from './i18n';", loader: 'ts', resolveDir: process.cwd() + '/plugin' },
+	stdin: { contents: source + "\nexport { FrenchTyposSettingTab, BookFontModal, doubleApostropheQuote, noteBodyStart, imageCaption }; export { setLocale, t } from './i18n';", loader: 'ts', resolveDir: process.cwd() + '/plugin' },
 	bundle: true, write: false, format: 'cjs', external: ['obsidian', '@codemirror/state', '@codemirror/view']
 }).outputFiles[0].text, {
 	module: moduleForCheck,
@@ -56,6 +56,14 @@ runInNewContext(buildSync({
 		editorInfoField
 	} : require(name)
 });
+
+for (const [alt, src, expected] of [
+	['Une légende', 'images/photo.jpg', 'Une légende'],
+	['photo.jpg', 'images/photo.jpg', ''],
+	['images/photo.jpg', 'images/photo.jpg', ''],
+	['300x200', 'photo.jpg', ''],
+	['', 'photo.jpg', '']
+]) assert.equal(moduleForCheck.exports.imageCaption(alt, src), expected);
 
 const plugin = new moduleForCheck.exports.default();
 plugin.settings = { highlightEnabled: true };

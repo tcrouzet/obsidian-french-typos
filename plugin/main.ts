@@ -69,17 +69,30 @@ function noteBodyStart(text: string): number {
 	return opening[0].length + closing.index + closing[0].length + (closing[0].endsWith('\n') ? 0 : 1);
 }
 
-function markIndentExclusions(element: HTMLElement) {
-	const paragraphs = element.matches('.cm-line, p') ? [element] : Array.from(element.querySelectorAll<HTMLElement>('.cm-line, p'));
+function imageCaption(alt: string, src: string): string {
+	return alt && alt !== src && alt !== src.split('/').pop() && !/^\d+(?:x\d+)?$/.test(alt) ? alt : '';
+}
+
+function updateNoteElements(element: HTMLElement) {
+	const images = element.matches('.image-embed') ? [element] : Array.from(element.querySelectorAll<HTMLElement>('.image-embed'));
+	for (const image of images) {
+		const alt = image.getAttribute('alt')?.trim() ?? '';
+		const src = image.getAttribute('src') ?? '';
+		const caption = imageCaption(alt, src);
+		if (caption) image.setAttribute('data-french-typos-caption', caption);
+		else image.removeAttribute('data-french-typos-caption');
+	}
+	const paragraphs = element.matches('.cm-line, p') ? [element] : Array.from(element.querySelectorAll<HTMLElement>(element.matches('.cm-content') ? ':scope > .cm-line' : '.cm-line, p'));
 	for (const paragraph of paragraphs) {
-		paragraph.classList.toggle('french-typos-no-indent', !!paragraph.querySelector('hr, img:not(.cm-widgetBuffer), .image-embed, .cm-image'));
+		if (paragraph.closest('figure, figcaption, .image-embed')) continue;
+		paragraph.classList.toggle('french-typos-no-indent', !!paragraph.querySelector('hr, img:not(.cm-widgetBuffer), .image-embed, .cm-image, figure, figcaption'));
 	}
 }
 
 function observeIndentExclusions(element: HTMLElement): MutationObserver {
-	const observer = new MutationObserver(() => markIndentExclusions(element));
-	observer.observe(element, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-	markIndentExclusions(element);
+	const observer = new MutationObserver(() => updateNoteElements(element));
+	observer.observe(element, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'alt', 'src'] });
+	updateNoteElements(element);
 	return observer;
 }
 
@@ -106,9 +119,9 @@ export default class FrenchTypos extends Plugin {
 			const menu = new Menu().setUseNativeMenu(false);
 			const current = this.bookViews.has(view) ? 'book' : view.getMode() !== 'source' ? null : view.getState().source === true ? 'source' : 'live';
 			for (const [mode, title, icon] of [
+				['book', t('bookPreview'), 'book-open'],
 				['source', t('sourceMode'), 'code-xml'],
-				['live', t('livePreview'), 'edit-3'],
-				['book', t('bookPreview'), 'book-open']
+				['live', t('livePreview'), 'edit-3']
 			] as const) {
 				menu.addItem(item => item.setTitle(title).setIcon(icon).setChecked(current === mode)
 					.onClick(() => this.setBookMode(view, mode)));
@@ -236,7 +249,10 @@ export default class FrenchTypos extends Plugin {
 		this.registerEditorExtension(this.createCursorStyle());
 		this.registerEditorExtension(EditorView.contentAttributes.of((view): Record<string, string> => {
 			const info = view.state.field(editorInfoField, false);
-			return info instanceof MarkdownView && this.bookViews.has(info) && this.settings.bookHyphenate ? { lang: 'fr' } : {};
+			if (!(info instanceof MarkdownView)) return {};
+			return this.bookViews.has(info) && this.settings.bookHyphenate
+				? { class: 'french-typos-note-content', lang: 'fr' }
+				: { class: 'french-typos-note-content' };
 		}));
 		this.registerEditorExtension(this.createIndentExclusions());
 		this.registerMarkdownPostProcessor((element, context) => {

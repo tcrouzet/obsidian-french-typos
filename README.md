@@ -48,6 +48,8 @@ Dans le menu du stylo de la barre d’état, choisir **Aperçu livre** pour chan
 
 Le bouton On/Off en tête de **Réglages → French Typos → Aperçu livre** permet aussi d’activer ce mode pour la note courante. Le désactiver ramène à l’aperçu en direct. Sans note ouverte, le bouton est désactivé.
 
+En aperçu livre, le texte alternatif de `![Légende](image.jpg)` apparaît sous l’image. Les noms de fichiers et les dimensions seuls ne sont pas affichés comme légendes.
+
 L’aperçu livre masque les panneaux latéraux, dont l’explorateur de fichiers. En quittant ce mode, les panneaux ouverts auparavant sont rétablis et ceux qui étaient fermés le restent.
 
 La section **Aperçu livre** des réglages possède son propre profil : police, taille du texte de 12 à 40 pixels, justification, suppression de l’espace entre paragraphes, alinéas et césure française. Par défaut : **police serif du système, 20 pixels, justification, paragraphes sans espacement, alinéas et césure activés**. Les changements s’appliquent immédiatement aux notes affichées en Aperçu livre, sans modifier les réglages de l’aperçu habituel.
