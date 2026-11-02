@@ -2,6 +2,7 @@
   "apostrophe": true,
   "doubleApostropheQuotes": true,
   "quotationmarks": true,
+  "automaticHardSpace": true,
   "emdashes": true,
   "endashes": true,
   "twoenters": false,

@@ -43,7 +43,7 @@ function noteState(config) {
 }
 const moduleForCheck = { exports: {} };
 runInNewContext(buildSync({
-	stdin: { contents: source + "\nexport { FrenchTyposSettingTab, BookFontModal, doubleApostropheQuote, noteBodyStart, imageCaption, updateNoteElements }; export { setLocale, t } from './i18n';", loader: 'ts', resolveDir: process.cwd() + '/plugin' },
+	stdin: { contents: source + "\nexport { FrenchTyposSettingTab, BookFontModal, doubleApostropheQuote, noteBodyStart, punctuationSpace, imageCaption, updateNoteElements }; export { setLocale, t } from './i18n';", loader: 'ts', resolveDir: process.cwd() + '/plugin' },
 	bundle: true, write: false, format: 'cjs', external: ['obsidian', '@codemirror/state', '@codemirror/view']
 }).outputFiles[0].text, {
 	module: moduleForCheck,
@@ -85,6 +85,10 @@ imageAttributes.set('alt', '');
 assert.equal(moduleForCheck.exports.updateNoteElements(imageElement), true);
 assert.equal(imageAttributes.has('data-french-typos-caption'), false);
 console.log('Caption updates: no repeated DOM writes; text changes and removal signal layout changes.');
+
+for (const previous of ['', 'a', ' ', '\u00a0', '\u202f']) {
+	assert.equal(moduleForCheck.exports.punctuationSpace(previous), ['\u00a0', '\u202f'].includes(previous) ? '' : '\u00a0');
+}
 
 const plugin = new moduleForCheck.exports.default();
 plugin.settings = { highlightEnabled: true };
@@ -200,7 +204,7 @@ assert.equal(tab.icon, 'french-typos');
 const definitions = tab.getSettingDefinitions();
 const settings = Array.from(definitions).flatMap(definition => Array.from(definition.items || [definition]));
 assert.equal(settings.filter(definition => definition.control).map(definition => definition.control.key).sort().join(','),
-	'apostrophe,bookHyphenate,bookIndent,bookJustify,bookNoParagraphSpacing,bookTextSize,desactivatelinks,doubleApostropheQuotes,emdashes,emptytlines,endashes,quotationmarks,twoenters');
+	'apostrophe,automaticHardSpace,bookHyphenate,bookIndent,bookJustify,bookNoParagraphSpacing,bookTextSize,desactivatelinks,doubleApostropheQuotes,emdashes,emptytlines,endashes,quotationmarks,twoenters');
 assert.equal(typeof settings.find(definition => definition.name === 'Highlight').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'Button').render, 'function');
 assert.equal(typeof settings.find(definition => definition.name === 'First line indent').render, 'function');
@@ -297,7 +301,7 @@ console.log('Bold cursor: automatic or custom color, YAML and foreign editors ex
 async function checkLoadedSettings() {
 	const defaults = {
 		...bookDefaults,
-		apostrophe: true, doubleApostropheQuotes: false, quotationmarks: true, emdashes: true, endashes: true,
+		automaticHardSpace: true, apostrophe: true, doubleApostropheQuotes: false, quotationmarks: true, emdashes: true, endashes: true,
 		twoenters: false, desactivatelinks: true, firstLineIndent: true, emptytlines: 'small',
 		highlightEnabled: true, highlightButton: true, cursorWidth: 0, highlightColor: ''
 	};
@@ -309,7 +313,7 @@ async function checkLoadedSettings() {
 	for (const emptytlines of ['normal', 'small', 'invisible']) {
 		const saved = {
 			...bookDefaults, bookFont: 'Palatino', bookTextSize: 24, bookJustify: false, bookNoParagraphSpacing: false, bookIndent: false, bookHyphenate: false,
-			apostrophe: false, doubleApostropheQuotes: true, quotationmarks: false, emdashes: false, endashes: false,
+			automaticHardSpace: false, apostrophe: false, doubleApostropheQuotes: true, quotationmarks: false, emdashes: false, endashes: false,
 			twoenters: true, desactivatelinks: false, firstLineIndent: false, emptytlines,
 			highlightEnabled: false, highlightButton: false, cursorWidth: 3, highlightColor: '#12abEF'
 		};

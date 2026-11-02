@@ -46,5 +46,7 @@
   "standard": "Standard",
   "button": "Button",
   "buttonDescription": "Show on/off button in status bar",
-  "pixels": "{value} px"
+  "pixels": "{value} px",
+  "automaticHardSpace": "Automatic hard space before : ? ! ;",
+  "automaticHardSpaceDescription": "Insert a non-breaking space before punctuation while typing, outside code blocks and YAML frontmatter. Convert an existing regular space without adding a duplicate."
 }

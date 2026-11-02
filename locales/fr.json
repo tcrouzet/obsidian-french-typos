@@ -46,5 +46,7 @@
   "standard": "Standard",
   "button": "Bouton",
   "buttonDescription": "Afficher le bouton d’activation dans la barre d’état.",
-  "pixels": "{value} px"
+  "pixels": "{value} px",
+  "automaticHardSpace": "Espace insécable automatique avant : ? ! ;",
+  "automaticHardSpaceDescription": "Insérer une espace insécable avant ces ponctuations pendant la saisie, hors blocs de code et frontmatter YAML. Convertir une espace normale déjà présente, sans doublon."
 }

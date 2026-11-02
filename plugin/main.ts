@@ -16,6 +16,7 @@ interface FrenchTyposSettings {
 	apostrophe: boolean;
 	doubleApostropheQuotes: boolean;
 	quotationmarks: boolean;
+	automaticHardSpace: boolean;
 	emdashes: boolean;
 	endashes: boolean;
 	twoenters: boolean;
@@ -38,6 +39,7 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	apostrophe: true,
 	doubleApostropheQuotes: false,
 	quotationmarks: true,
+	automaticHardSpace: true,
 	emdashes: true,
 	endashes: true,
 	twoenters: false,
@@ -54,6 +56,10 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	bookNoParagraphSpacing: true,
 	bookIndent: true,
 	bookHyphenate: true,
+}
+
+function punctuationSpace(previous: string): string {
+	return previous === '\u00a0' || previous === '\u202f' ? '' : '\u00a0';
 }
 
 function doubleApostropheQuote(beforeCursor: string): string | null {
@@ -172,6 +178,22 @@ export default class FrenchTypos extends Plugin {
 				if (editor.listSelections().some(({ anchor, head }) =>
 					editor.posToOffset(anchor) < bodyStart || editor.posToOffset(head) < bodyStart)) return;
 				const cursor = editor.getCursor();
+				if (this.settings.automaticHardSpace && /^[?!:;]$/.test(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing && !editor.getSelection()) {
+					const cm = (editor as Editor & { cm?: EditorView }).cm;
+					if (cm && event.target instanceof Element && event.target.closest('[contenteditable="true"]') === cm.contentDOM) {
+						const node = cm.domAtPos(editor.posToOffset(cursor)).node;
+						const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement;
+						if (!element?.closest('.HyperMD-codeblock, .cm-inline-code')) {
+							const previous = cursor.ch ? editor.getRange({ line: cursor.line, ch: cursor.ch - 1 }, cursor) : '';
+							const start = { line: cursor.line, ch: cursor.ch - (previous === ' ' ? 1 : 0) };
+							const insertion = punctuationSpace(previous) + event.key;
+							event.preventDefault();
+							editor.replaceRange(insertion, start, cursor);
+							editor.setCursor({ line: start.line, ch: start.ch + insertion.length });
+							return;
+						}
+					}
+				}
 				const quote = (event.key === "'" || event.key === '’') && this.settings.doubleApostropheQuotes && !editor.getSelection()
 					? doubleApostropheQuote(editor.getRange(editor.offsetToPos(bodyStart), cursor))
 					: null;
@@ -732,6 +754,11 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 						name: t('quotationMarks'),
 						desc: t('quotationMarksDescription'),
 						control: { type: 'toggle', key: 'quotationmarks' }
+					},
+					{
+						name: t('automaticHardSpace'),
+						desc: t('automaticHardSpaceDescription'),
+						control: { type: 'toggle', key: 'automaticHardSpace' }
 					},
 					{
 						name: t('emDashes'),

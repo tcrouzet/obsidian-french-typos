@@ -26,6 +26,8 @@ Obsidian **1.14 ou ultérieur** est requis. L’interface suit automatiquement l
 | `--` suivi d’une espace | Un tiret demi-cadratin et une espace insécable `– ` |
 | `''`, avec l’option correspondante | Un guillemet anglais `“`, ou `”` si un guillemet est déjà ouvert |
 
+L’option **Espace insécable automatique avant : ? ! ;**, dans **Aperçu en direct**, ajoute cette espace pendant la saisie ou convertit une espace normale déjà présente. Une espace insécable existante est conservée sans doublon. Les blocs de code et le frontmatter YAML sont exclus. Activée par défaut, cette option fonctionne aussi en aperçu livre.
+
 Les espaces insécables gardent le guillemet avec le texte et le tiret avec le début du dialogue, même en fin de ligne.
 
 Pour les guillemets anglais, activer **Deux apostrophes pour des guillemets anglais** dans **Réglages → French Typos**. Saisir `''bonjour''` donne `“bonjour”`. L’option est désactivée par défaut ; elle fonctionne aussi avec la conversion en apostrophes courbes active.
