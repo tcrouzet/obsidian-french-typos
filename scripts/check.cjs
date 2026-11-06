@@ -170,6 +170,21 @@ const partial = plugin.createDecorations().create({ state: partialState, visible
 assert.deepEqual(decorations(partial, partialState.doc.length), [[3, 3, 'french-typos-empty-line']]);
 console.log('Partial viewport: only genuinely empty lines are marked.');
 
+const scrollingState = noteState({ doc: 'First paragraph\n\n![Caption](image.jpg)\n\nLast paragraph' });
+const scrollingView = { state: scrollingState, visibleRanges: [{ from: 0, to: 15 }] };
+const scrolling = plugin.createDecorations().create(scrollingView);
+const structural = [
+	[16, 16, 'french-typos-empty-line'],
+	[17, 17, 'french-typos-media-line'],
+	[39, 39, 'french-typos-empty-line']
+];
+assert.deepEqual(decorations(scrolling, scrollingState.doc.length), structural, 'Layout decorations must exist before a line enters the viewport');
+const beforeScroll = scrolling.decorations;
+scrollingView.visibleRanges = [{ from: 40, to: scrollingState.doc.length }];
+scrolling.update({ docChanged: false, viewportChanged: true, transactions: [], view: scrollingView });
+assert.equal(scrolling.decorations, beforeScroll, 'Scrolling must not rebuild decorations that change line geometry');
+console.log('Scrolling: empty and image lines retain their layout decorations across viewport changes.');
+
 const yamlDoc = "---\ntitle: 'a\u00a0—\t'\n\n---\n\nTexte\u00a0—\t";
 const yamlState = noteState({ doc: yamlDoc });
 const yamlDecorations = plugin.createDecorations().create({ state: yamlState, visibleRanges: [{ from: 0, to: yamlDoc.length }] });

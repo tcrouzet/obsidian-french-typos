@@ -561,7 +561,7 @@ export default class FrenchTypos extends Plugin {
 			}
 
 			update(update: ViewUpdate) {
-				if (update.docChanged || update.viewportChanged || update.transactions.some(transaction =>
+				if (update.docChanged || update.transactions.some(transaction =>
 					transaction.effects.some(effect => effect.is(refreshHighlight)))) {
 					this.decorations = this.buildDecorations(update.view);
 				}
@@ -572,35 +572,22 @@ export default class FrenchTypos extends Plugin {
 				const builder = new RangeSetBuilder<Decoration>();
 				const enabled = highlightEnabled();
 				const bodyStart = noteBodyStart(view.state.doc.toString());
-				for (const { from, to } of view.visibleRanges) {
-					const text = view.state.doc.sliceString(from, to);
-					for (let i = 0; i <= text.length; i++) {
-						if (from + i < bodyStart) {
-							if (view.state.doc.lineAt(from + i).from === from + i) {
-								builder.add(from + i, from + i, frontmatterDecoration);
-							}
-							continue;
-						}
-						if ((i === 0 || text[i - 1] === '\n') && view.state.doc.lineAt(from + i).length === 0) {
-							builder.add(from + i, from + i, emptyLineDecoration);
-						}
-						if (i === 0 || text[i - 1] === '\n') {
-							const line = view.state.doc.lineAt(from + i);
-							if (line.from === from + i && line.text.includes('![')) builder.add(line.from, line.from, mediaLineDecoration);
-						}
-						if (!enabled) continue;
-						if (text[i] === '\u00A0') {
-							builder.add(from + i, from + i + 1, invisibleCharDecoration);
-						}
-						if (text[i] === '\t') {
-							builder.add(from + i, from + i + 1, tabDecoration);
-						}
-						if (text[i] === '—') {
-							builder.add(from + i, from + i + 1, emDashDecoration);
-						}
-						if (text[i] === '–') {
-							builder.add(from + i, from + i + 1, enDashDecoration);
-						}
+				// Keep layout classes stable when CodeMirror recycles lines during scrolling.
+				for (let number = 1; number <= view.state.doc.lines; number++) {
+					const line = view.state.doc.line(number);
+					if (line.from < bodyStart) {
+						builder.add(line.from, line.from, frontmatterDecoration);
+						continue;
+					}
+					if (line.length === 0) builder.add(line.from, line.from, emptyLineDecoration);
+					if (line.text.includes('![')) builder.add(line.from, line.from, mediaLineDecoration);
+					if (!enabled) continue;
+					for (let i = 0; i < line.length; i++) {
+						const position = line.from + i;
+						if (line.text[i] === '\u00A0') builder.add(position, position + 1, invisibleCharDecoration);
+						if (line.text[i] === '\t') builder.add(position, position + 1, tabDecoration);
+						if (line.text[i] === '—') builder.add(position, position + 1, emDashDecoration);
+						if (line.text[i] === '–') builder.add(position, position + 1, enDashDecoration);
 					}
 				}
 				return builder.finish();
