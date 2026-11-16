@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { runInNewContext } = require('node:vm');
 const { buildSync } = require('esbuild');
-const { EditorState, StateField } = require('@codemirror/state');
+const { EditorState, StateField, StateEffect } = require('@codemirror/state');
 const { Linter } = require('eslint');
 const ts = require('typescript');
 
@@ -38,10 +38,13 @@ console.log('Source lint: no this alias, explicit any, unused variables, unsafe 
 
 class MarkdownView {}
 const editorInfoField = StateField.define({ create: () => new MarkdownView(), update: value => value });
+const previewMode = StateEffect.define();
+const editorLivePreviewField = StateField.define({ create: () => true, update: (value, tr) => tr.effects.find(effect => effect.is(previewMode))?.value ?? value });
 function noteState(config) {
-	return EditorState.create({ ...config, extensions: [editorInfoField] });
+	return EditorState.create({ ...config, extensions: [editorInfoField, editorLivePreviewField] });
 }
 const moduleForCheck = { exports: {} };
+const cursorLayers = [];
 runInNewContext(buildSync({
 	stdin: { contents: source + "\nexport { FrenchTyposSettingTab, BookFontModal, doubleApostropheQuote, noteBodyStart, punctuationSpace, imageCaption, updateNoteElements }; export { setLocale, t } from './i18n';", loader: 'ts', resolveDir: process.cwd() + '/plugin' },
 	bundle: true, write: false, format: 'cjs', external: ['obsidian', '@codemirror/state', '@codemirror/view']
@@ -53,8 +56,12 @@ runInNewContext(buildSync({
 		FuzzySuggestModal: class { setPlaceholder(value) { this.placeholder = value; } },
 		PluginSettingTab: class { constructor(app, plugin) { this.app = app; this.plugin = plugin; } },
 		MarkdownView,
-		editorInfoField
-	} : require(name)
+		editorInfoField,
+		editorLivePreviewField
+	} : name === '@codemirror/view' ? { ...require(name), layer(config) {
+		cursorLayers.push(config);
+		return require(name).layer(config);
+	} } : require(name)
 });
 
 for (const [alt, src, expected] of [
@@ -227,7 +234,7 @@ assert.equal(typeof settings.find(definition => definition.name === 'Cursor size
 assert.equal(typeof settings.find(definition => definition.name === 'Color').render, 'function');
 assert.doesNotMatch(settings.find(definition => definition.name === 'Empty lines').desc, /reload/i);
 assert.deepEqual(Array.from(Array.from(definitions).find(definition => definition.heading === 'Highlight').items, item => item.name),
-	['Highlight', 'Color', 'Cursor size', 'Button']);
+	['Highlight', 'Color', 'Cursor shape', 'Cursor size', 'Button']);
 const bookSettings = Array.from(Array.from(definitions).find(definition => definition.heading === 'Book preview').items);
 assert.equal(typeof bookSettings.find(definition => definition.name === 'Font').render, 'function');
 assert.equal(bookSettings[0].name, 'Book preview');
@@ -248,7 +255,7 @@ for (const language of ['fr', 'fr-CA', 'FR_fr']) {
 	setLocale(language);
 	const translated = tab.getSettingDefinitions();
 	assert.deepEqual(Array.from(translated, group => group.heading), ['Aperçu en direct', 'Aperçu livre', 'Mise en évidence']);
-	assert.deepEqual(Array.from(translated[2].items, item => item.name), ['Mise en évidence', 'Couleur', 'Épaisseur du curseur', 'Bouton']);
+	assert.deepEqual(Array.from(translated[2].items, item => item.name), ['Mise en évidence', 'Couleur', 'Forme du curseur', 'Épaisseur du curseur', 'Bouton']);
 	assert.deepEqual({ ...translated[0].items.find(item => item.control?.key === 'emptytlines').control.options },
 		{ normal: 'Normales', small: 'Réduites', invisible: 'Invisibles' });
 	assert.equal(t('pixels', { value: 24 }), '24 px');
@@ -290,6 +297,21 @@ const cursorState = noteState({ doc: 'Normal paragraph' });
 const automaticCursor = plugin.cursorAttributes({ state: cursorState });
 assert.equal(automaticCursor.class, 'french-typos-bold-cursor');
 assert.ok(automaticCursor.style.includes('3px'));
+plugin.createCursorStyle();
+const cursorLayer = cursorLayers[0];
+assert.ok(cursorLayer, 'The custom cursor must have a persistent layer');
+const cursorElement = { style: {}, setCssStyles(styles) { Object.assign(this.style, styles); } };
+assert.equal(cursorLayer.update({ selectionSet: false, focusChanged: true }, cursorElement), true, 'Focus changes must redraw the cursor');
+assert.equal(cursorElement.style.animationName, 'cm-blink');
+assert.equal(cursorLayer.update({ selectionSet: true, focusChanged: false }, cursorElement), true);
+assert.equal(cursorElement.style.animationName, 'cm-blink2');
+assert.deepEqual(Array.from(cursorLayer.markers({ state: noteState({ doc: 'Selected text', selection: { anchor: 0, head: 8 } }) })), [], 'Text selection must not draw a cursor over the selection');
+assert.deepEqual(Array.from(cursorLayer.markers({ state: EditorState.create({ doc: 'Foreign editor' }) })), []);
+
+const sourceCursorState = cursorState.update({ effects: previewMode.of(false) }).state;
+assert.equal(plugin.cursorAttributes({ state: sourceCursorState }).class, 'french-typos-bold-cursor', 'Source mode must keep the configured cursor width');
+assert.equal(plugin.settings.cursorWidth, 3, 'Source mode must preserve the saved cursor width');
+assert.equal(plugin.cursorAttributes({ state: sourceCursorState.update({ effects: previewMode.of(true) }).state }).class, 'french-typos-bold-cursor');
 assert.ok(automaticCursor.style.includes('var(--h1-color, var(--text-normal))'));
 for (const doc of ['Normal paragraph', '```text\nalpha beta\n```']) {
 	const start = doc.startsWith('```') ? 8 : 0;
@@ -308,6 +330,12 @@ for (const anchor of [0, 5]) {
 assert.equal(plugin.cursorAttributes({ state: noteState({ doc: cursorYaml, selection: { anchor: cursorYaml.length } }) }).class,
 	'french-typos-bold-cursor');
 assert.deepEqual({ ...plugin.cursorAttributes({ state: EditorState.create({ doc: 'Settings editor' }) }) }, {});
+plugin.settings.cursorShape = 'block';
+assert.equal(plugin.cursorAttributes({ state: sourceCursorState }).class, 'french-typos-block-cursor');
+assert.deepEqual(Array.from(cursorLayer.markers({ state: sourceCursorState })), [], 'Native block must not draw an additional cursor');
+assert.equal(plugin.settings.cursorWidth, 3);
+plugin.settings.cursorShape = 'bar';
+assert.ok(plugin.cursorAttributes({ state: sourceCursorState }).style.includes('3px'));
 plugin.settings.cursorWidth = 0;
 assert.equal(plugin.cursorAttributes({ state: cursorState }).class, undefined);
 assert.ok(plugin.cursorAttributes({ state: cursorState }).style.includes('#12abEF'), 'Color must remain available to highlighted characters with a standard cursor');
@@ -318,7 +346,7 @@ async function checkLoadedSettings() {
 		...bookDefaults,
 		automaticEllipsis: true, automaticHardSpace: true, apostrophe: true, doubleApostropheQuotes: false, quotationmarks: true, emdashes: true, endashes: true,
 		twoenters: false, desactivatelinks: true, firstLineIndent: true, emptytlines: 'small',
-		highlightEnabled: true, highlightButton: true, cursorWidth: 0, highlightColor: ''
+		highlightEnabled: true, highlightButton: true, cursorWidth: 0, cursorShape: 'bar', highlightColor: ''
 	};
 	for (const data of [null, undefined, [], 'invalid', 42, { hyphenate: true }, { hyphenate: false }, { apostrophe: 'false', doubleApostropheQuotes: 'true', firstLineIndent: 'false', emptytlines: 'invalid' }]) {
 		plugin.loadData = async () => data;
@@ -330,7 +358,7 @@ async function checkLoadedSettings() {
 			...bookDefaults, bookFont: 'Palatino', bookTextSize: 24, bookJustify: false, bookNoParagraphSpacing: false, bookIndent: false, bookHyphenate: false,
 			automaticEllipsis: false, automaticHardSpace: false, apostrophe: false, doubleApostropheQuotes: true, quotationmarks: false, emdashes: false, endashes: false,
 			twoenters: true, desactivatelinks: false, firstLineIndent: false, emptytlines,
-			highlightEnabled: false, highlightButton: false, cursorWidth: 3, highlightColor: '#12abEF'
+			highlightEnabled: false, highlightButton: false, cursorWidth: 3, cursorShape: 'block', highlightColor: '#12abEF'
 		};
 		plugin.loadData = async () => saved;
 		await plugin.loadSettings();
@@ -348,6 +376,11 @@ async function checkLoadedSettings() {
 		plugin.loadData = async () => ({ bookFont });
 		await plugin.loadSettings();
 		assert.equal(plugin.settings.bookFont, 'serif');
+	}
+	for (const cursorShape of ['invalid', '', null, 3, true]) {
+		plugin.loadData = async () => ({ cursorShape });
+		await plugin.loadSettings();
+		assert.equal(plugin.settings.cursorShape, 'bar');
 	}
 	for (const cursorWidth of [-1, 7, 2.5, NaN, Infinity, '3', true]) {
 		plugin.loadData = async () => ({ cursorWidth });

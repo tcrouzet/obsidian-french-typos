@@ -1,6 +1,6 @@
 import { App, Editor, FuzzySuggestModal, MarkdownView, MarkdownRenderChild, Menu, Notice, PluginSettingTab, Plugin, SettingDefinitionItem, addIcon, editorInfoField, getLanguage } from 'obsidian';
-import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, drawSelection } from '@codemirror/view';
-import { Compartment, RangeSetBuilder, StateEffect } from '@codemirror/state';
+import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, layer, RectangleMarker } from '@codemirror/view';
+import { RangeSetBuilder, StateEffect } from '@codemirror/state';
 
 import { setLocale, t } from './i18n';
 
@@ -27,6 +27,7 @@ interface FrenchTyposSettings {
 	highlightEnabled: boolean;
 	highlightButton: boolean;
 	cursorWidth: number;
+	cursorShape: 'bar' | 'block';
 	highlightColor: string;
 	bookFont: string;
 	bookTextSize: number;
@@ -51,6 +52,7 @@ const DEFAULT_SETTINGS: FrenchTyposSettings = {
 	highlightEnabled: true,
 	highlightButton: true,
 	cursorWidth: 0,
+	cursorShape: 'bar',
 	highlightColor: '',
 	bookFont: 'serif',
 	bookTextSize: 20,
@@ -362,6 +364,8 @@ export default class FrenchTypos extends Plugin {
 				if (value === 'normal' || value === 'small' || value === 'invisible') {
 					this.settings.emptytlines = value;
 				}
+			} else if (key === 'cursorShape') {
+				if (value === 'bar' || value === 'block') this.settings.cursorShape = value;
 			} else if (key === 'cursorWidth') {
 				if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 6) this.settings.cursorWidth = value;
 			} else if (key === 'highlightColor') {
@@ -496,7 +500,9 @@ export default class FrenchTypos extends Plugin {
 		if (!(view.state.field(editorInfoField, false) instanceof MarkdownView)) return {};
 		const style = `--french-typos-highlight-color: ${this.settings.highlightColor || 'var(--h1-color, var(--text-normal))'};`;
 		const bodyStart = noteBodyStart(view.state.doc.toString());
-		if (!this.settings.cursorWidth || view.state.selection.ranges.some(range => !range.empty || range.from < bodyStart)) return { style };
+		if (view.state.selection.ranges.some(range => !range.empty || range.from < bodyStart)) return { style };
+		if (this.settings.cursorShape === 'block') return { class: 'french-typos-block-cursor', style };
+		if (!this.settings.cursorWidth) return { style };
 		return {
 			class: 'french-typos-bold-cursor',
 			style: `${style} --french-typos-cursor-width: ${this.settings.cursorWidth}px;`
@@ -505,23 +511,23 @@ export default class FrenchTypos extends Plugin {
 
 	createCursorStyle() {
 		const attributes = (view: EditorView) => this.cursorAttributes(view);
-		const compartment = new Compartment();
-		const standard: [] = [];
-		const drawing = drawSelection();
-		return [compartment.of(standard), EditorView.editorAttributes.of(attributes), ViewPlugin.fromClass(class {
-			destroyed = false;
-			constructor(view: EditorView) { this.sync(view); }
-			update(update: ViewUpdate) { this.sync(update.view); }
-			sync(view: EditorView) {
-				if (compartment.get(view.state) === (attributes(view).class ? drawing : standard)) return;
-				// Reconfigure after the current editor update has finished.
-				queueMicrotask(() => {
-					if (this.destroyed) return;
-					const desired = attributes(view).class ? drawing : standard;
-					if (compartment.get(view.state) !== desired) view.dispatch({ effects: compartment.reconfigure(desired) });
-				});
+		return [EditorView.editorAttributes.of(attributes), layer({
+			above: true,
+			class: 'cm-cursorLayer',
+			mount(element) { element.classList.add('french-typos-cursor-layer'); },
+			markers(view) {
+				if (attributes(view).class !== 'french-typos-bold-cursor') return [];
+				const markers: RectangleMarker[] = [];
+				for (const range of view.state.selection.ranges) markers.push(...RectangleMarker.forRange(view, 'cm-cursor', range));
+				return markers;
+			},
+			update(update, element) {
+				if (update.selectionSet || update.focusChanged) {
+					element.setCssStyles({ animationName: element.style.animationName === 'cm-blink' ? 'cm-blink2' : 'cm-blink' });
+				}
+				// Keep the cursor layer mounted, including while native text selection is active.
+				return true;
 			}
-			destroy() { this.destroyed = true; }
 		})];
 	}
 
@@ -896,6 +902,21 @@ class FrenchTyposSettingTab extends PluginSettingTab {
 								await this.plugin.saveSettings();
 								this.update();
 							}));
+						}
+					},
+					{
+						name: t('cursorShape'),
+						desc: t('cursorShapeDescription'),
+						render: setting => {
+							setting.addDropdown(dropdown => dropdown
+								.addOption('bar', t('cursorBar'))
+								.addOption('block', t('cursorBlock'))
+								.setValue(this.plugin.settings.cursorShape)
+								.onChange(async value => {
+									if (value !== 'bar' && value !== 'block') return;
+									this.plugin.settings.cursorShape = value;
+									await this.plugin.saveSettings();
+								}));
 						}
 					},
 					{

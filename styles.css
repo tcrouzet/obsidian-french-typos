@@ -37,6 +37,15 @@ canvas.french-typos-theme-color {
     color: var(--h1-color, var(--text-normal));
 }
 
+.workspace-leaf-content[data-type="markdown"] .markdown-source-view.mod-cm6 .cm-editor.french-typos-block-cursor .french-typos-note-content {
+    caret-shape: block;
+    caret-color: var(--french-typos-highlight-color);
+}
+
+.workspace-leaf-content[data-type="markdown"] .markdown-source-view.mod-cm6 .cm-editor.french-typos-bold-cursor.cm-focused .french-typos-note-content {
+    caret-color: transparent;
+}
+
 .workspace-leaf-content[data-type="markdown"] .markdown-source-view.mod-cm6 .cm-editor.french-typos-bold-cursor .cm-cursor {
     border-left-width: var(--french-typos-cursor-width);
     border-left-color: var(--french-typos-highlight-color);
